@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   initStorage, 
   getOperator, 
   setOperator, 
   getStore, 
   setStore, 
+  getStores,
+  saveCounts,
   getSyncMode, 
   getInventories, 
   saveInventory, 
@@ -29,6 +31,7 @@ export default function App() {
   // Inicializa o banco de dados local
   useEffect(() => {
     initStorage();
+    setStoresList(getStores());
   }, []);
 
   // CONFIGURAÇÃO DE TEMA
@@ -46,6 +49,7 @@ export default function App() {
   // ESTADO DE AUTENTICAÇÃO E CONFIGURAÇÃO
   const [operator, setOperatorState] = useState(getOperator());
   const [store, setStoreState] = useState(getStore());
+  const [stores, setStoresList] = useState([]);
   const [isLoggedIn, setIsLoggedIn] = useState(!!getOperator() && !!getStore());
 
   // INVENTÁRIO SELECIONADO
@@ -66,6 +70,12 @@ export default function App() {
   const [scanQty, setScanQty] = useState(1);
   const [activeSector, setActiveSector] = useState('Setor 01');
   const [isRecountMode, setIsRecountMode] = useState(false);
+  const [isBlindCount, setIsBlindCount] = useState(localStorage.getItem('sc_blind_count') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('sc_blind_count', isBlindCount);
+  }, [isBlindCount]);
+
   const [cameraOpen, setCameraOpen] = useState(false);
   const [palletOpen, setPalletOpen] = useState(false);
 
@@ -75,8 +85,14 @@ export default function App() {
 
   // CAMPOS DE CRIAÇÃO LOCAL
   const [newInvName, setNewInvName] = useState('');
-  const [newInvCategory, setNewInvCategory] = useState('Alimentos');
+  const [newInvCategory, setNewInvCategory] = useState('');
   const [newInvBrand, setNewInvBrand] = useState('');
+
+  // Extrai categorias do catálogo de forma dinâmica
+  const categoriesList = useMemo(() => {
+    const unique = Array.from(new Set(catalog.map(p => p.category))).filter(Boolean);
+    return unique.length > 0 ? unique.sort() : ["Alimentos", "Bebidas", "Higiene", "Limpeza", "Eletrônicos", "Vestuário"];
+  }, [catalog]);
 
   // NOVO SETOR
   const [newSectorName, setNewSectorName] = useState('');
@@ -92,6 +108,26 @@ export default function App() {
       setCounts(getCounts());
     }
   }, [isLoggedIn]);
+
+  // Carrega os setores do inventário ativo quando ele muda
+  useEffect(() => {
+    if (currentInventory) {
+      const savedSectors = localStorage.getItem(`sc_sectors_${currentInventory.id}`);
+      if (savedSectors) {
+        const parsed = JSON.parse(savedSectors);
+        setSectors(parsed);
+        setActiveSector(parsed[0] || '');
+      } else {
+        const defaultSectors = ['Setor 01', 'Setor 02', 'Setor 03'];
+        setSectors(defaultSectors);
+        setActiveSector(defaultSectors[0]);
+        localStorage.setItem(`sc_sectors_${currentInventory.id}`, JSON.stringify(defaultSectors));
+      }
+    } else {
+      setSectors(['Setor 01', 'Setor 02', 'Setor 03']);
+      setActiveSector('Setor 01');
+    }
+  }, [currentInventory]);
 
   // LOGIN FLOW
   const handleLogin = (e) => {
@@ -162,6 +198,28 @@ export default function App() {
     alert(`Inventário "${newInv.name}" criado localmente e iniciado!`);
   };
 
+  // EXCLUIR INVENTÁRIO LOCAL
+  const handleDeleteInventory = (invId, e) => {
+    e.stopPropagation(); // Evita selecionar o inventário ao clicar em excluir
+    if (confirm("Tem certeza que deseja excluir este inventário local e todas as suas contagens?")) {
+      const list = getInventories();
+      const filtered = list.filter(i => i.id !== invId);
+      localStorage.setItem('sc_inventories', JSON.stringify(filtered));
+      setInventories(filtered);
+      
+      const countsList = getCounts();
+      const filteredCounts = countsList.filter(c => c.idInventario !== invId);
+      saveCounts(filteredCounts);
+      setCounts(filteredCounts);
+      
+      if (currentInventory?.id === invId) {
+        setCurrentInventory(null);
+      }
+      
+      alert("Inventário excluído com sucesso.");
+    }
+  };
+
   // ENTRADA DE CÓDIGO DE BARRAS (SCANNER OU MANUAL)
   const processBarcode = (code) => {
     const cleanCode = code.trim();
@@ -203,14 +261,11 @@ export default function App() {
 
     } else {
       // Produto não cadastrado
-      playErrorBuzzer();
-      
-      // Abre prompt rápido ou permite registrar
-      const desc = prompt("Produto não encontrado no catálogo! Digite uma descrição temporária se deseja coletar mesmo assim, ou cancele:");
-      if (desc !== null) {
+      if (isBlindCount) {
+        // Modo Contagem Cega: registra o produto avulso automaticamente sem perguntar nada
         const newTempProd = {
           barcode: cleanCode,
-          description: desc || "Produto Avulso Não Cadastrado",
+          description: `Produto Avulso (EAN: ${cleanCode})`,
           brand: "Avulsa",
           category: "Geral",
           price: 0.0,
@@ -231,11 +286,67 @@ export default function App() {
           mode: isRecountMode ? 'recontagem' : 'coleta'
         };
 
+        // Simula Integração em Tempo Real via API se o modo for online
+        const syncMode = getSyncMode();
+        if (syncMode === 'online') {
+          simulateRealTimeAPI(countRecord, newTempProd.description);
+        }
+
         addCount(countRecord);
         setCounts(getCounts());
         setBarcodeInput('');
         setScannedProduct(newTempProd);
         playSuccessBeep();
+
+        // Auto-foca o campo de código novamente
+        setTimeout(() => {
+          barcodeInputRef.current?.focus();
+        }, 50);
+      } else {
+        playErrorBuzzer();
+        // Abre prompt rápido ou permite registrar
+        const desc = prompt("Produto não encontrado no catálogo! Digite uma descrição temporária se deseja coletar mesmo assim, ou cancele:");
+        if (desc !== null) {
+          const newTempProd = {
+            barcode: cleanCode,
+            description: desc || "Produto Avulso Não Cadastrado",
+            brand: "Avulsa",
+            category: "Geral",
+            price: 0.0,
+            stock: 0
+          };
+          // Adiciona temporário ao catálogo local
+          const updatedCat = [newTempProd, ...catalog];
+          setCatalog(updatedCat);
+          setCatalogState(updatedCat);
+
+          // Prossegue com o registro da contagem
+          const countRecord = {
+            idInventario: currentInventory.id,
+            barcode: cleanCode,
+            quantity: parseFloat(scanQty) || 1,
+            sector: activeSector,
+            operator: operator,
+            mode: isRecountMode ? 'recontagem' : 'coleta'
+          };
+
+          // Simula Integração em Tempo Real via API se o modo for online
+          const syncMode = getSyncMode();
+          if (syncMode === 'online') {
+            simulateRealTimeAPI(countRecord, newTempProd.description);
+          }
+
+          addCount(countRecord);
+          setCounts(getCounts());
+          setBarcodeInput('');
+          setScannedProduct(newTempProd);
+          playSuccessBeep();
+
+          // Auto-foca o campo de código novamente
+          setTimeout(() => {
+            barcodeInputRef.current?.focus();
+          }, 50);
+        }
       }
     }
   };
@@ -302,9 +413,43 @@ export default function App() {
     }
     const updated = [...sectors, newSectorName.trim()];
     setSectors(updated);
+    if (currentInventory) {
+      localStorage.setItem(`sc_sectors_${currentInventory.id}`, JSON.stringify(updated));
+    }
     setActiveSector(newSectorName.trim());
     setNewSectorName('');
     alert(`Setor "${newSectorName.trim()}" criado e selecionado!`);
+  };
+
+  // EXCLUIR SETOR
+  const handleDeleteSector = (secName, e) => {
+    e.stopPropagation(); // Evita selecionar o setor ao excluir
+    
+    // Verifica se existem contagens associadas ao setor no inventário atual
+    const secCounts = activeInventoryCounts.filter(c => c.sector === secName);
+    if (secCounts.length > 0) {
+      if (!confirm(`Atenção: Existem ${secCounts.length} contagens no "${secName}". Se você excluí-lo, todas as contagens deste setor serão apagadas definitivamente! Deseja continuar?`)) {
+        return;
+      }
+      
+      // Exclui contagens associadas
+      const countsList = getCounts();
+      const filteredCounts = countsList.filter(c => !(c.idInventario === currentInventory.id && c.sector === secName));
+      saveCounts(filteredCounts);
+      setCounts(filteredCounts);
+    }
+    
+    const updated = sectors.filter(s => s !== secName);
+    setSectors(updated);
+    if (currentInventory) {
+      localStorage.setItem(`sc_sectors_${currentInventory.id}`, JSON.stringify(updated));
+    }
+    
+    if (activeSector === secName) {
+      setActiveSector(updated[0] || '');
+    }
+    
+    alert(`Setor "${secName}" excluído com sucesso.`);
   };
 
   // EDICÃO NA MANUTENÇÃO
@@ -334,6 +479,7 @@ export default function App() {
     if (confirm("ATENÇÃO: Isso irá apagar todas as contagens locais, inventários e redefinir o catálogo padrão. Continuar?")) {
       resetAllStorage();
       handleLogout();
+      setStoresList(getStores());
       alert("Aplicativo redefinido com sucesso.");
     }
   };
@@ -410,10 +556,9 @@ export default function App() {
               <label>Selecione a Loja</label>
               <select value={store} onChange={(e) => setStoreState(e.target.value)} required>
                 <option value="">-- Escolha a Loja --</option>
-                <option value="Loja Centro">Loja Centro</option>
-                <option value="Loja Shopping">Loja Shopping</option>
-                <option value="Loja Norte">Loja Norte</option>
-                <option value="Depósito Geral">Depósito Geral</option>
+                {stores.map((s, idx) => (
+                  <option key={idx} value={s}>{s}</option>
+                ))}
               </select>
             </div>
 
@@ -479,19 +624,28 @@ export default function App() {
                     <p className="card-subtitle">Sessões ativas criadas no ERP central.</p>
                   </div>
                   <div className="inventories-list" style={{ marginTop: '12px' }}>
-                    {inventories.filter(i => i.isERP).map(inv => (
-                      <div 
-                        key={inv.id} 
-                        className={`inv-card ${currentInventory?.id === inv.id ? 'active-card' : ''}`}
-                        onClick={() => handleSelectInventory(inv)}
-                      >
-                        <div>
-                          <div className="inv-name">{inv.name}</div>
-                          <div className="inv-meta">Loja: {inv.store} • Filtro: {inv.categoryFilter}</div>
-                        </div>
-                        <span className="inv-tag erp">ERP</span>
+                    {inventories.filter(i => i.isERP).length === 0 ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px', fontSize: '13px', border: '1px dashed var(--border-color)', borderRadius: '12px' }}>
+                        🔌 Integração com ERP Inativa <br />
+                        <span style={{ fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                          Conecte a API do ERP na aba <strong>Sinc & ERP</strong> para carregar as sessões de inventário.
+                        </span>
                       </div>
-                    ))}
+                    ) : (
+                      inventories.filter(i => i.isERP).map(inv => (
+                        <div 
+                          key={inv.id} 
+                          className={`inv-card ${currentInventory?.id === inv.id ? 'active-card' : ''}`}
+                          onClick={() => handleSelectInventory(inv)}
+                        >
+                          <div>
+                            <div className="inv-name">{inv.name}</div>
+                            <div className="inv-meta">Loja: {inv.store} • Filtro: {inv.categoryFilter}</div>
+                          </div>
+                          <span className="inv-tag erp">ERP</span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -512,15 +666,12 @@ export default function App() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Categoria Filtrada</label>
+                      <label>Categoria Filtrada (Do Catálogo)</label>
                       <select value={newInvCategory} onChange={(e) => setNewInvCategory(e.target.value)}>
-                        <option value="">Todas</option>
-                        <option value="Alimentos">Alimentos</option>
-                        <option value="Bebidas">Bebidas</option>
-                        <option value="Higiene">Higiene</option>
-                        <option value="Limpeza">Limpeza</option>
-                        <option value="Eletrônicos">Eletrônicos</option>
-                        <option value="Vestuário">Vestuário</option>
+                        <option value="">Todas as Categorias</option>
+                        {categoriesList.map((cat, idx) => (
+                          <option key={idx} value={cat}>{cat}</option>
+                        ))}
                       </select>
                     </div>
                     <button type="submit" className="btn-create-local">Criar e Iniciar Contagem</button>
@@ -544,7 +695,35 @@ export default function App() {
                             <div className="inv-name">{inv.name}</div>
                             <div className="inv-meta">Loja: {inv.store} • Criado em: {new Date(inv.createdAt).toLocaleDateString()}</div>
                           </div>
-                          <span className="inv-tag">Local</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className="inv-tag">Local</span>
+                            <button 
+                              className="btn-delete-inv" 
+                              onClick={(e) => handleDeleteInventory(inv.id, e)}
+                              title="Excluir Inventário"
+                              style={{ 
+                                background: 'rgba(239, 68, 68, 0.15)', 
+                                color: '#ef4444', 
+                                border: '1px solid rgba(239, 68, 68, 0.3)', 
+                                padding: '6px 10px', 
+                                borderRadius: '8px', 
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s ease'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                              }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -558,13 +737,29 @@ export default function App() {
               <div className="animate-fade">
                 
                 {/* BARRA DE STATUS DA CONTAGEM */}
-                <div className="collect-header-status" style={{ background: '#0e1524' }}>
-                  <div className="status-left">
-                    <span>Setor: <strong>{activeSector}</strong></span>
+                <div className="collect-header-status" style={{ background: '#0e1524', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="status-left">
+                      <span>Setor: <strong>{activeSector}</strong></span>
+                    </div>
+                    <div className="status-right">
+                      <span className={`mode-indicator ${isRecountMode ? 'recount' : 'normal'}`}>
+                        {isRecountMode ? 'CONFERÊNCIA (NÃO AGREGA)' : 'CONTAGEM ATIVA'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="status-right">
-                    <span className={`mode-indicator ${isRecountMode ? 'recount' : 'normal'}`}>
-                      {isRecountMode ? 'CONFERÊNCIA (NÃO AGREGA)' : 'CONTAGEM ATIVA'}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={isBlindCount} 
+                        onChange={(e) => setIsBlindCount(e.target.checked)}
+                        style={{ cursor: 'pointer', width: '14px', height: '14px' }}
+                      />
+                      <span>Modo Contagem Cega (Sem validar catálogo)</span>
+                    </label>
+                    <span style={{ fontSize: '10px', color: isBlindCount ? 'var(--color-primary)' : 'var(--text-muted)', fontWeight: 'bold' }}>
+                      {isBlindCount ? 'CEGO 👁️‍🗨️' : 'VALIDAÇÃO 📋'}
                     </span>
                   </div>
                 </div>
@@ -727,9 +922,37 @@ export default function App() {
                             <span className="sector-name">{sec}</span>
                             <span className="sector-meta">{secCounts.length} leituras</span>
                           </div>
-                          <strong style={{ color: activeSector === sec ? 'var(--color-primary)' : 'white' }}>
-                            {secTotal} un
-                          </strong>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <strong style={{ color: activeSector === sec ? 'var(--color-primary)' : 'white' }}>
+                              {secTotal} un
+                            </strong>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteSector(sec, e)}
+                              title="Excluir Setor"
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                color: '#ef4444',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                              }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -926,19 +1149,19 @@ export default function App() {
             </button>
 
             <button 
-              className={`nav-item ${activeTab === 'collect' ? 'active' : ''}`}
-              onClick={() => { setActiveTab('collect'); setMergedCounts(null); }}
-            >
-              <span className="nav-icon">🎯</span>
-              <span>Coletar</span>
-            </button>
-
-            <button 
               className={`nav-item ${activeTab === 'sectors' ? 'active' : ''}`}
               onClick={() => { setActiveTab('sectors'); setMergedCounts(null); }}
             >
               <span className="nav-icon">📍</span>
               <span>Setores</span>
+            </button>
+
+            <button 
+              className={`nav-item ${activeTab === 'collect' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('collect'); setMergedCounts(null); }}
+            >
+              <span className="nav-icon">🎯</span>
+              <span>Coletar</span>
             </button>
 
             <button 

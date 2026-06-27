@@ -1,26 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { getKardex, addKardexMove, getSyncMode, setSyncMode, getApiEndpoint, setApiEndpoint } from '../utils/storage';
+import { getSyncMode, setSyncMode, getApiEndpoint, setApiEndpoint } from '../utils/storage';
 import { exportToTXT, exportToCSV, printPDFReport } from '../utils/exporter';
 
 export default function KardexDashboard({ inventory, counts, catalog, mergedCounts, onClearLocalCounts }) {
   const [syncMode, setLocalSyncMode] = useState(getSyncMode());
   const [apiEndpoint, setLocalApiEndpoint] = useState(getApiEndpoint());
-  const [kardexList, setKardexList] = useState(getKardex());
-  
-  // Para simular novas transações de Kardex
-  const [newBarcode, setNewBarcode] = useState('');
-  const [newType, setNewType] = useState('venda');
-  const [newQty, setNewQty] = useState(1);
-  const [newTimeOffset, setNewTimeOffset] = useState(5); // Minutos após início
-
-  // Logs de chamadas de API simuladas
   const [apiLogs, setApiLogs] = useState([]);
   
   // Contagens unificadas (coletas locais ou mesclagem de arquivos)
   const activeCounts = mergedCounts || counts.filter(c => c.idInventario === inventory.id);
-
-  // Calcula início da contagem
-  const startTime = inventory.startedAt ? new Date(inventory.startedAt) : new Date();
 
   useEffect(() => {
     // Escuta logs enviados pelo App principal caso ocorram leituras em tempo real
@@ -57,94 +45,98 @@ export default function KardexDashboard({ inventory, counts, catalog, mergedCoun
     setApiLogs(newLogs);
   };
 
-  // Simular transação no Kardex
-  const handleAddKardexTransaction = (e) => {
-    e.preventDefault();
-    if (!newBarcode || newQty <= 0) return;
-
-    // Calcula timestamp com base no tempo de início + offset de minutos
-    const transTime = new Date(startTime.getTime() + newTimeOffset * 60 * 1000);
-    
-    const move = {
-      barcode: newBarcode,
-      type: newType,
-      quantity: Number(newQty),
-      timestamp: transTime.toISOString()
-    };
-
-    addKardexMove(move);
-    setKardexList(getKardex());
-    setNewBarcode('');
-    alert(`Lançamento Kardex adicionado: ${newType === 'venda' ? 'Venda' : 'Entrada'} de ${newQty}x do produto ${newBarcode}`);
-  };
-
-  // Processa conciliação do Kardex
-  const getKardexAdjustments = () => {
-    const adjustments = [];
-    
-    catalog.forEach(p => {
-      const pCounts = activeCounts.filter(c => c.barcode === p.barcode && c.mode !== 'recontagem');
-      const qtyFisica = pCounts.reduce((acc, c) => acc + c.quantity, 0);
-
-      // Filtra movimentações do Kardex ocorridas APÓS a hora de início
-      const pKardex = kardexList.filter(k => k.barcode === p.barcode && new Date(k.timestamp) > startTime);
+  // Testar Conexão com o ERP
+  const handleTestConnection = async () => {
+    addLog('API TEST', `Testando conexão HTTP POST com o endpoint: ${apiEndpoint}...`);
+    try {
+      const startTimeMs = Date.now();
+      // Envia uma requisição HTTP real. Nota: Pode dar erro de CORS em servidores locais de teste,
+      // mas é o comportamento esperado para provar que a chamada foi feita.
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true, timestamp: new Date().toISOString(), app: "Amura Collector" })
+      });
       
-      const sales = pKardex.filter(k => k.type === 'venda').reduce((acc, k) => acc + k.quantity, 0);
-      const entries = pKardex.filter(k => k.type === 'entrada').reduce((acc, k) => acc + k.quantity, 0);
-
-      if (qtyFisica > 0 || sales > 0 || entries > 0 || p.stock > 0) {
-        adjustments.push({
-          barcode: p.barcode,
-          description: p.description,
-          brand: p.brand,
-          category: p.category,
-          stock: p.stock,
-          counted: qtyFisica,
-          sales,
-          entries,
-          // Final Conciliado = Contado - Vendas + Entradas
-          finalQty: qtyFisica - sales + entries,
-          divergence: (qtyFisica - sales + entries) - p.stock
-        });
+      const duration = Date.now() - startTimeMs;
+      if (response.ok || response.status === 201 || response.status === 200) {
+        addLog('API RESPONSE', `Conexão bem-sucedida! Status: ${response.status} OK (Duração: ${duration}ms)`);
+        alert('Teste de conexão bem-sucedido! O ERP está online e respondendo.');
+      } else {
+        addLog('API RESPONSE', `Erro na resposta do ERP. Status: ${response.status} ${response.statusText} (Duração: ${duration}ms)`);
+        alert(`O servidor respondeu, mas retornou um status de erro: ${response.status}.`);
       }
-    });
-
-    return adjustments;
+    } catch (err) {
+      addLog('API ERROR', `Falha de rede ao tentar se conectar. Detalhes: ${err.message}`);
+      alert(`Falha de conexão física/rede: ${err.message}\n\n(Consulte o monitor de logs abaixo para ver o erro técnico de rede ou restrição de CORS).`);
+    }
   };
 
-  const adjustments = getKardexAdjustments();
-
-  // Enviar contagem em lote para o ERP via API
-  const handleSyncBatchAPI = () => {
+  // Enviar contagem em lote para o ERP via API (simplificado para contagem cega/normal)
+  const handleSyncBatchAPI = async () => {
     if (activeCounts.length === 0) {
       alert('Nenhuma contagem disponível para sincronizar.');
       return;
     }
 
-    addLog('API POST', `Enviando lote de contagem de inventário #${inventory.id} para ERP...`);
+    addLog('API POST', `Consolidando e enviando lote do inventário #${inventory.id} para o ERP no endpoint: ${apiEndpoint}...`);
     
-    // Simula a carga do JSON consolidada
-    const payload = adjustments.map(a => ({
-      codigoBarras: a.barcode,
-      quantidadeContada: a.counted,
-      quantidadeFinalAjustada: a.finalQty,
-      kardexVendasDescontadas: a.sales,
-      kardexEntradasSomadas: a.entries
-    }));
+    // Consolidar leituras normais por código de barras (desconsidera recontagem/conferência)
+    const consolidated = {};
+    activeCounts.forEach(c => {
+      if (c.mode !== 'recontagem') {
+        consolidated[c.barcode] = (consolidated[c.barcode] || 0) + c.quantity;
+      }
+    });
 
-    setTimeout(() => {
-      addLog('API RESPONSE', 'Sincronização em Lote concluída com sucesso! Status: 200 OK', payload);
-      alert('Sincronização de lote concluída! Dados integrados no ERP.');
-    }, 1500);
+    const payload = {
+      idInventario: inventory.id,
+      nomeInventario: inventory.name,
+      loja: inventory.store,
+      categoriaFiltro: inventory.categoryFilter || "Todas",
+      marcaFiltro: inventory.brandFilter || "Todas",
+      dataCriacao: inventory.createdAt,
+      dataInicio: inventory.startedAt, // Data/Hora de início do inventário (corte para o Kardex do ERP)
+      itens: Object.keys(consolidated).map(code => ({
+        codigoBarras: code,
+        quantidadeContada: consolidated[code]
+      }))
+    };
+
+    try {
+      const startTimeMs = Date.now();
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const duration = Date.now() - startTimeMs;
+      if (response.ok || response.status === 200 || response.status === 201) {
+        addLog('API RESPONSE', `Sincronização concluída com sucesso! Status: ${response.status} OK (Duração: ${duration}ms)`, payload);
+        alert('Contagem de lote enviada e integrada com sucesso no ERP!');
+      } else {
+        addLog('API RESPONSE', `Erro no processamento do lote pelo ERP. Status: ${response.status} (Duração: ${duration}ms)`, payload);
+        alert(`O ERP recebeu o lote, mas retornou erro de processamento: Status ${response.status}`);
+      }
+    } catch (err) {
+      addLog('API ERROR', `Falha de conexão ao enviar lote. Detalhes: ${err.message}`, payload);
+      alert(`Erro ao enviar lote: ${err.message}\n\n(A contagem continua salva de forma segura no aparelho. O payload JSON consolidado foi gerado e registrado no monitor de logs abaixo).`);
+    }
   };
+
+  // Contadores rápidos para o resumo de exportação
+  const totalCounted = activeCounts.filter(c => c.mode !== 'recontagem').reduce((acc, c) => acc + c.quantity, 0);
+  const totalDistinctSKUs = new Set(activeCounts.filter(c => c.mode !== 'recontagem').map(c => c.barcode)).size;
+  const sectorsCounted = new Set(activeCounts.map(c => c.sector)).size;
 
   return (
     <div className="kardex-dashboard-wrapper">
-      {/* 1. SELETOR DE MODO DE INTEGRACAO */}
+      {/* 1. SELETOR DE MODO E CONFIGURAÇÃO DA API */}
       <div className="card-custom glassmorphism animate-fade">
         <div className="card-header-custom">
-          <h4>🔌 Integração com ERP</h4>
-          <p className="card-subtitle">Configure como o Amura Collector transmite as coletas para a contagem do ERP.</p>
+          <h4>🔌 Integração de Comunicação com ERP</h4>
+          <p className="card-subtitle">Configure como o Amura Collector transmite as contagens coletadas ao sistema central.</p>
         </div>
 
         <div className="integration-mode-selector">
@@ -169,7 +161,7 @@ export default function KardexDashboard({ inventory, counts, catalog, mergedCoun
               onChange={() => handleModeChange('lote')}
             />
             <span className="mode-title">📦 Lote / Arquivo (Offline-First)</span>
-            <span className="mode-desc">Salva offline no aparelho. Ao final, mescle ou envie o lote conciliado via API / Arquivo TXT.</span>
+            <span className="mode-desc">Salva offline no aparelho. Ao final, mescle ou envie o lote completo via API / Arquivo TXT.</span>
           </label>
         </div>
 
@@ -183,130 +175,22 @@ export default function KardexDashboard({ inventory, counts, catalog, mergedCoun
               className="input-endpoint"
               placeholder="https://erp.sistema.com/api/contagem"
             />
-            <button className="btn-save-endpoint" onClick={handleSaveEndpoint}>Salvar</button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn-save-endpoint" style={{ background: '#7a0c7b' }} onClick={handleTestConnection}>Testar Conexão</button>
+              <button className="btn-save-endpoint" onClick={handleSaveEndpoint}>Salvar</button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 2. CONCILIAÇÃO KARDEX E DIVERGÊNCIAS */}
-      <div className="card-custom glassmorphism animate-fade" style={{ marginTop: '20px' }}>
-        <div className="card-header-custom">
-          <h4>📊 Painel de Conciliação Kardex & Divergências</h4>
-          <p className="card-subtitle">
-            Conciliação automática. Data/Hora de início do Inventário: <strong>{startTime.toLocaleString('pt-BR')}</strong>.
-            Movimentações do Kardex após este horário serão processadas na integração final.
-          </p>
-        </div>
-
-        {/* Lançador de Vendas/Entradas de Teste no Kardex */}
-        <form onSubmit={handleAddKardexTransaction} className="kardex-sim-form">
-          <h5>🛠️ Simular Movimentação no Kardex do ERP (Venda/Entrada durante contagem)</h5>
-          <div className="sim-inputs-row">
-            <select value={newBarcode} onChange={(e) => setNewBarcode(e.target.value)} className="input-sim select-prod" required>
-              <option value="">-- Escolha um Produto --</option>
-              {catalog.map(p => (
-                <option key={p.barcode} value={p.barcode}>{p.description} ({p.barcode})</option>
-              ))}
-            </select>
-
-            <select value={newType} onChange={(e) => setNewType(e.target.value)} className="input-sim width-auto">
-              <option value="venda">Venda (Saída)</option>
-              <option value="entrada">Compra (Entrada)</option>
-            </select>
-
-            <input
-              type="number"
-              min="1"
-              value={newQty}
-              onChange={(e) => setNewQty(Math.max(1, Number(e.target.value)))}
-              className="input-sim width-small"
-              placeholder="Qtd"
-              required
-            />
-
-            <input
-              type="number"
-              value={newTimeOffset}
-              onChange={(e) => setNewTimeOffset(Number(e.target.value))}
-              className="input-sim width-medium"
-              placeholder="Minutos pós-início"
-              title="Tempo em minutos após o início do inventário em que a venda/entrada ocorreu"
-            />
-
-            <button type="submit" className="btn-add-sim">Lançar no Kardex</button>
-          </div>
-        </form>
-
-        {/* Tabela de Divergências */}
-        <div className="table-responsive-kardex">
-          <table className="kardex-table">
-            <thead>
-              <tr>
-                <th>Produto</th>
-                <th className="txt-center">Estoque ERP</th>
-                <th className="txt-center">Contagem Física</th>
-                <th className="txt-center">Vendas Kardex (pós)</th>
-                <th className="txt-center">Entradas Kardex (pós)</th>
-                <th className="txt-center">Final Conciliado</th>
-                <th className="txt-center">Divergência</th>
-              </tr>
-            </thead>
-            <tbody>
-              {adjustments.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="txt-center padding-20">Nenhuma contagem realizada para comparar.</td>
-                </tr>
-              ) : (
-                adjustments.map((a, i) => {
-                  const isDivergent = a.divergence !== 0;
-                  const divClass = a.divergence < 0 ? 'div-neg' : 'div-pos';
-                  return (
-                    <tr key={i}>
-                      <td>
-                        <strong>{a.description}</strong>
-                        <div className="small-code">EAN: {a.barcode} • {a.brand} / {a.category}</div>
-                      </td>
-                      <td className="txt-center">{a.stock}</td>
-                      <td className="txt-center highlight-cell">{a.counted}</td>
-                      <td className="txt-center color-red">{a.sales > 0 ? `-${a.sales}` : '-'}</td>
-                      <td className="txt-center color-green">{a.entries > 0 ? `+${a.entries}` : '-'}</td>
-                      <td className="txt-center final-cell"><strong>{a.finalQty}</strong></td>
-                      <td className={`txt-center ${isDivergent ? divClass : 'div-ok'}`}>
-                        <strong>{isDivergent ? (a.divergence > 0 ? `+${a.divergence}` : a.divergence) : 'OK'}</strong>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Botões de Ação Final */}
-        <div className="integration-actions-row">
-          <button className="btn-action-kardex btn-primary" onClick={handleSyncBatchAPI} disabled={activeCounts.length === 0}>
-            📤 Sincronizar Lote no ERP
-          </button>
-          <button className="btn-action-kardex btn-secondary" onClick={() => printPDFReport(inventory, activeCounts, catalog, adjustments)} disabled={activeCounts.length === 0}>
-            🖨️ Imprimir PDF (Relatório)
-          </button>
-          <button className="btn-action-kardex btn-secondary" onClick={() => exportToTXT(activeCounts, `inventario_${inventory.id}_consolidado.txt`)} disabled={activeCounts.length === 0}>
-            💾 Exportar TXT (ERP)
-          </button>
-          <button className="btn-action-kardex btn-secondary" onClick={() => exportToCSV(activeCounts, catalog, `inventario_${inventory.id}_tabela.csv`)} disabled={activeCounts.length === 0}>
-            💾 Exportar Excel/CSV
-          </button>
-        </div>
-      </div>
-
-      {/* 3. SIMULADOR LOGS HTTP (API) */}
+      {/* 2. MONITOR DE COMUNICAÇÃO (LOGS HTTP) - MOVIDO PARA CIMA */}
       <div className="card-custom glassmorphism animate-fade" style={{ marginTop: '20px' }}>
         <div className="card-header-custom">
           <h4>📜 Monitor de Comunicação API (Log do ERP)</h4>
-          <p className="card-subtitle">Exibe o tráfego HTTP de requisições enviadas ao ERP do operador.</p>
+          <p className="card-subtitle">Exibe o tráfego HTTP de requisições enviadas ao ERP configurado.</p>
         </div>
 
-        <div className="api-log-viewer">
+        <div className="api-log-viewer" style={{ maxHeight: '200px' }}>
           {apiLogs.length === 0 ? (
             <div className="log-empty">Nenhuma chamada HTTP registrada no monitor.</div>
           ) : (
@@ -324,6 +208,87 @@ export default function KardexDashboard({ inventory, counts, catalog, mergedCoun
             ))
           )}
         </div>
+      </div>
+
+      {/* 3. PAINEL DE EXPORTAÇÃO E ENVIO DE DADOS (REPLACING KARDEX) */}
+      <div className="card-custom glassmorphism animate-fade" style={{ marginTop: '20px' }}>
+        <div className="card-header-custom">
+          <h4>📤 Ações de Exportação e Sincronização</h4>
+          <p className="card-subtitle">Sincronize ou exporte as contagens acumuladas para o banco de dados do seu ERP.</p>
+        </div>
+
+        <div className="summary-cards" style={{ margin: '15px 0' }}>
+          <div className="card" style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.02)', borderLeft: '4px solid var(--color-primary)', borderRadius: '6px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Físico Contado</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{totalCounted} un</div>
+          </div>
+          <div className="card" style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.02)', borderLeft: '4px solid var(--color-secondary)', borderRadius: '6px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>SKUs Únicos</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{totalDistinctSKUs} itens</div>
+          </div>
+          <div className="card" style={{ flex: 1, padding: '12px', background: 'rgba(255,255,255,0.02)', borderLeft: '4px solid var(--color-success)', borderRadius: '6px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Setores</div>
+            <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{sectorsCounted} setores</div>
+          </div>
+        </div>
+
+        <div className="integration-actions-row" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
+          <button 
+            className="btn-action-kardex btn-primary" 
+            onClick={handleSyncBatchAPI} 
+            disabled={activeCounts.length === 0}
+            style={{ width: '100%', padding: '12px', fontWeight: 'bold' }}
+          >
+            📤 Enviar Lote de Contagem via API
+          </button>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            <button 
+              className="btn-action-kardex btn-secondary" 
+              onClick={() => printPDFReport(inventory, activeCounts, catalog)} 
+              disabled={activeCounts.length === 0}
+              style={{ padding: '10px 4px', fontSize: '12px' }}
+            >
+              🖨️ Relatório PDF
+            </button>
+            <button 
+              className="btn-action-kardex btn-secondary" 
+              onClick={() => exportToTXT(activeCounts, `inventario_${inventory.id}_consolidado.txt`)} 
+              disabled={activeCounts.length === 0}
+              style={{ padding: '10px 4px', fontSize: '12px' }}
+            >
+              💾 Exportar TXT
+            </button>
+            <button 
+              className="btn-action-kardex btn-secondary" 
+              onClick={() => exportToCSV(activeCounts, catalog, `inventario_${inventory.id}_tabela.csv`)} 
+              disabled={activeCounts.length === 0}
+              style={{ padding: '10px 4px', fontSize: '12px' }}
+            >
+              💾 Exportar CSV
+            </button>
+          </div>
+        </div>
+
+        {activeCounts.length > 0 && (
+          <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'center' }}>
+            <button 
+              onClick={onClearLocalCounts}
+              style={{ 
+                background: 'rgba(239, 68, 68, 0.1)', 
+                color: 'var(--color-danger)', 
+                border: '1px solid rgba(239, 68, 68, 0.2)', 
+                padding: '8px 16px', 
+                borderRadius: '8px', 
+                fontSize: '11px',
+                fontWeight: '500',
+                cursor: 'pointer' 
+              }}
+            >
+              🗑️ Limpar Contagens Locais Deste Inventário
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

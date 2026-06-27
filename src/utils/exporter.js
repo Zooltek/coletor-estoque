@@ -47,9 +47,9 @@ export const exportToCSV = (counts, catalog, filename = 'contagem_inventario.csv
 
   Object.keys(consolidated).forEach(code => {
     const prod = catalog.find(p => p.barcode === code);
-    const desc = prod ? prod.description : 'Produto Não Cadastrado';
-    const brand = prod ? prod.brand : 'N/A';
-    const cat = prod ? prod.category : 'N/A';
+    const desc = prod ? prod.description : `Produto Avulso (EAN: ${code})`;
+    const brand = prod ? prod.brand : 'Avulsa';
+    const cat = prod ? prod.category : 'Geral';
     content += `${code};${desc};${brand};${cat};${consolidated[code]}\n`;
   });
 
@@ -57,7 +57,7 @@ export const exportToCSV = (counts, catalog, filename = 'contagem_inventario.csv
 };
 
 // 3. Exportar PDF (Gera uma visualização de impressão rica em outra janela)
-export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) => {
+export const printPDFReport = (inventory, counts, catalog) => {
   const printWindow = window.open('', '_blank');
   
   // Consolidar contagens normais
@@ -83,36 +83,19 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
     sectorSummary[sec].distinctItems.add(c.barcode);
   });
 
-  // Calcula divergências e produtividade
   let totalFisico = 0;
-  let totalDivergencias = 0;
   const itemsRows = catalog.map(p => {
     const qtyColetada = consolidatedCounts[p.barcode] || 0;
     const qtyRecount = recountCounts[p.barcode] || 0;
-    const tecStock = p.stock || 0;
-    
-    // Ajuste do Kardex (se existir)
-    const adj = kardexAdjustments ? kardexAdjustments.find(a => a.barcode === p.barcode) : null;
-    const sales = adj ? adj.sales : 0;
-    const entries = adj ? adj.entries : 0;
-    
-    // Qtd física conciliação = contagem - vendas + entradas
-    const finalQty = qtyColetada - sales + entries;
-    const diff = finalQty - tecStock;
 
     if (qtyColetada > 0) totalFisico += qtyColetada;
-    if (diff !== 0) totalDivergencias++;
 
     return {
       ...p,
       qtyColetada,
-      qtyRecount,
-      sales,
-      entries,
-      finalQty,
-      diff
+      qtyRecount
     };
-  }).filter(row => row.qtyColetada > 0 || row.qtyRecount > 0 || row.stock > 0);
+  }).filter(row => row.qtyColetada > 0 || row.qtyRecount > 0);
 
   const startFormatted = inventory.startedAt ? new Date(inventory.startedAt).toLocaleString('pt-BR') : 'Não Iniciado';
   const createdFormatted = new Date(inventory.createdAt).toLocaleString('pt-BR');
@@ -122,7 +105,7 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
     <html lang="pt-BR">
     <head>
       <meta charset="UTF-8">
-      <title>Relatório de Inventário - ${inventory.name}</title>
+      <title>Relatório de Contagem - ${inventory.name}</title>
       <style>
         body {
           font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -144,7 +127,7 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
         }
         .meta-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(2, 1fr);
           gap: 15px;
           margin-bottom: 20px;
           background-color: #f8f9fa;
@@ -167,10 +150,6 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
           border-left: 5px solid #f26522;
           border-radius: 4px;
           box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-        .card.divergencia {
-          border-left-color: #dc3545;
-          background: #fdf3f4;
         }
         .card.setores {
           border-left-color: #7a0c7b;
@@ -211,7 +190,6 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
           border-radius: 3px;
         }
         .badge-success { background: #198754; color: white; }
-        .badge-danger { background: #dc3545; color: white; }
         .badge-warning { background: #ffc107; color: #333; }
         
         .footer {
@@ -236,7 +214,7 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
       <div class="header">
         <div>
           <h1>Amura Collector</h1>
-          <p style="margin: 3px 0 0 0; color: #6c757d;">Relatório Executivo de Inventário de Estoque</p>
+          <p style="margin: 3px 0 0 0; color: #6c757d;">Relatório Executivo de Contagem de Estoque</p>
         </div>
         <div style="text-align: right;">
           <strong>Data de Emissão:</strong> ${new Date().toLocaleDateString('pt-BR')}<br>
@@ -249,7 +227,7 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
         <div class="meta-item"><strong>Loja:</strong> ${inventory.store}</div>
         <div class="meta-item"><strong>Status:</strong> <span class="badge ${inventory.status === 'aberto' ? 'badge-warning' : 'badge-success'}">${inventory.status.toUpperCase()}</span></div>
         <div class="meta-item"><strong>Criado em:</strong> ${createdFormatted}</div>
-        <div class="meta-item"><strong>Horário de Início (Corte Kardex):</strong> ${startFormatted}</div>
+        <div class="meta-item"><strong>Horário de Início:</strong> ${startFormatted}</div>
         <div class="meta-item"><strong>Filtros:</strong> Categoria: ${inventory.categoryFilter || 'Todas'}, Marca: ${inventory.brandFilter || 'Todas'}</div>
       </div>
 
@@ -257,10 +235,6 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
         <div class="card">
           <div>Total de Peças Contadas</div>
           <div class="card-val">${totalFisico} un</div>
-        </div>
-        <div class="card divergencia">
-          <div>Itens com Divergência</div>
-          <div class="card-val">${totalDivergencias} itens</div>
         </div>
         <div class="card setores">
           <div>Setores Auditados</div>
@@ -288,44 +262,27 @@ export const printPDFReport = (inventory, counts, catalog, kardexAdjustments) =>
         </tbody>
       </table>
 
-      <h2>Detalhamento do Inventário e Conciliação Kardex</h2>
+      <h2>Detalhamento do Inventário</h2>
       <table>
         <thead>
           <tr>
-            <th>Código</th>
+            <th>Código de Barras</th>
             <th>Descrição</th>
-            <th>Marca/Cat</th>
+            <th>Marca / Categoria</th>
             <th class="txt-right">Contagem Física</th>
             <th class="txt-right">Recontagem (Conf.)</th>
-            <th class="txt-right">Vendas Pós-Início</th>
-            <th class="txt-right">Entradas Pós-Início</th>
-            <th class="txt-right">Estoque Conciliado</th>
-            <th class="txt-right">Estoque ERP</th>
-            <th class="txt-right">Divergência</th>
           </tr>
         </thead>
         <tbody>
-          ${itemsRows.map(row => {
-            const isDiff = row.diff !== 0;
-            const diffClass = row.diff < 0 ? 'badge-danger' : 'badge-success';
-            const diffText = row.diff > 0 ? `+${row.diff}` : row.diff;
-            return `
-              <tr>
-                <td><code>${row.barcode}</code></td>
-                <td>${row.description}</td>
-                <td><small>${row.brand} / ${row.category}</small></td>
-                <td class="txt-right"><strong>${row.qtyColetada}</strong></td>
-                <td class="txt-right" style="color: #6c757d;">${row.qtyRecount || '-'}</td>
-                <td class="txt-right" style="color: #dc3545;">${row.sales ? `-${row.sales}` : '-'}</td>
-                <td class="txt-right" style="color: #198754;">${row.entries ? `+${row.entries}` : '-'}</td>
-                <td class="txt-right" style="background: #f8f9fa;"><strong>${row.finalQty}</strong></td>
-                <td class="txt-right">${row.stock}</td>
-                <td class="txt-right">
-                  ${isDiff ? `<span class="badge ${diffClass}">${diffText}</span>` : '<span style="color: #198754;">OK</span>'}
-                </td>
-              </tr>
-            `;
-          }).join('')}
+          ${itemsRows.map(row => `
+            <tr>
+              <td><code>${row.barcode}</code></td>
+              <td>${row.description}</td>
+              <td><small>${row.brand} / ${row.category}</small></td>
+              <td class="txt-right"><strong>${row.qtyColetada}</strong></td>
+              <td class="txt-right" style="color: #6c757d;">${row.qtyRecount || '-'}</td>
+            </tr>
+          `).join('')}
         </tbody>
       </table>
 

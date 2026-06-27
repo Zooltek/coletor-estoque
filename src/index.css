@@ -254,6 +254,12 @@ body {
   .device-screen {
     border-radius: 0;
   }
+  .device-status-bar {
+    display: none;
+  }
+  .device-home-bar {
+    display: none;
+  }
 }
 
 /* ==========================================================================

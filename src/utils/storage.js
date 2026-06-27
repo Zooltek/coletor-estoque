@@ -1,5 +1,5 @@
 // storage.js - Armazenamento Offline-first usando LocalStorage
-import { mockCatalog } from '../data/mockCatalog';
+import { mockCatalog, mockStores } from '../data/mockCatalog';
 
 const KEYS = {
   CATALOG: 'sc_catalog',
@@ -8,6 +8,7 @@ const KEYS = {
   KARDEX: 'sc_kardex',
   OPERATOR: 'sc_operator',
   STORE: 'sc_store',
+  STORES: 'sc_stores',
   API_ENDPOINT: 'sc_api_endpoint',
   SYNC_MODE: 'sc_sync_mode', // 'online' | 'lote'
 };
@@ -19,31 +20,11 @@ export const initStorage = () => {
   }
 
   if (!localStorage.getItem(KEYS.INVENTORIES)) {
-    const defaultInventories = [
-      {
-        id: "erp-101",
-        name: "Inventário Geral - Alimentos & Bebidas (ERP)",
-        store: "Loja Centro",
-        brandFilter: "",
-        categoryFilter: "Alimentos",
-        createdAt: "2026-06-10T10:00:00.000Z",
-        startedAt: "2026-06-10T14:00:00.000Z",
-        isERP: true,
-        status: "aberto"
-      },
-      {
-        id: "erp-102",
-        name: "Inventário Geral - Eletrônicos (ERP)",
-        store: "Loja Shopping",
-        brandFilter: "",
-        categoryFilter: "Eletrônicos",
-        createdAt: "2026-06-10T11:30:00.000Z",
-        startedAt: null,
-        isERP: true,
-        status: "aberto"
-      }
-    ];
-    localStorage.setItem(KEYS.INVENTORIES, JSON.stringify(defaultInventories));
+    localStorage.setItem(KEYS.INVENTORIES, JSON.stringify([]));
+  }
+
+  if (!localStorage.getItem(KEYS.STORES)) {
+    localStorage.setItem(KEYS.STORES, JSON.stringify(mockStores));
   }
 
   if (!localStorage.getItem(KEYS.COUNTS)) {
@@ -203,11 +184,20 @@ export const addKardexMove = (move) => {
   return newMove;
 };
 
+// LOJAS
+export const getStores = () => {
+  return JSON.parse(localStorage.getItem(KEYS.STORES) || '[]');
+};
+export const setStores = (stores) => {
+  localStorage.setItem(KEYS.STORES, JSON.stringify(stores));
+};
+
 // LIMPAR TUDO (Reset do App)
 export const resetAllStorage = () => {
   localStorage.removeItem(KEYS.CATALOG);
   localStorage.removeItem(KEYS.INVENTORIES);
   localStorage.removeItem(KEYS.COUNTS);
   localStorage.removeItem(KEYS.KARDEX);
+  localStorage.removeItem(KEYS.STORES);
   initStorage();
 };

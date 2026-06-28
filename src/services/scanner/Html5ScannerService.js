@@ -6,8 +6,6 @@ export default class Html5ScannerService extends IScanner {
     super();
     this.html5Qrcode = null;
     this.isScanning = false;
-    this.isPaused = false;
-    this.lastScanned = { code: '', time: 0 };
   }
 
   async initialize() {
@@ -22,7 +20,6 @@ export default class Html5ScannerService extends IScanner {
 
     this.html5Qrcode = new Html5Qrcode(elementId);
     this.isScanning = true;
-    this.isPaused = false;
 
     await this.html5Qrcode.start(
       { facingMode: "environment" },
@@ -31,7 +28,6 @@ export default class Html5ScannerService extends IScanner {
         qrbox: { width: 260, height: 130 }
       },
       (decodedText) => {
-        if (this.isPaused) return;
         onScan(decodedText);
       },
       (errorMessage) => {
@@ -46,16 +42,15 @@ export default class Html5ScannerService extends IScanner {
       this.html5Qrcode.clear();
     }
     this.isScanning = false;
-    this.isPaused = false;
     this.html5Qrcode = null;
   }
 
   async pause() {
-    this.isPaused = true;
+    // Software pause is now handled by ScannerPipeline
   }
 
   async resume() {
-    this.isPaused = false;
+    // Software resume is now handled by ScannerPipeline
   }
 
   async toggleTorch(on) {

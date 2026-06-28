@@ -1,5 +1,5 @@
 import React from 'react';
-import ScannerHeader from './ScannerHeader';
+import { ScannerToolbar } from './toolbar';
 import ScannerCameraArea from './ScannerCameraArea';
 import { ScannerFooter } from './footer';
 import ScannerInfoCard from './ScannerInfoCard';
@@ -27,11 +27,10 @@ export default function ScannerLayout({
 }) {
   return (
     <div className="scanner-professional-layout">
-      <ScannerHeader 
+      <ScannerToolbar 
         title={currentInventory?.name || 'Inventário'} 
         onClose={onClose}
-        soundMuted={soundMuted}
-        onToggleMute={onToggleMute}
+        pipelineState={pipelineState}
       />
       
       <div className="spl-top-info">

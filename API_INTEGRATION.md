@@ -12,6 +12,9 @@ A comunicação com o app é estruturada de duas formas principais:
 
 Para que o coletor exiba as descrições dos produtos ao ler os códigos de barras, o ERP deve disponibilizar a lista de produtos cadastrados.
 
+> [!TIP]
+> **População Dinâmica de Categorias e Filtros:** As categorias de filtragem exibidas na tela de novos inventários locais (avulsos) são obtidas de forma dinâmica a partir dos valores únicos contidos na coluna/propriedade `categoria` (ou `category`) dos produtos importados no catálogo. Se o ERP utiliza filtros específicos por setores/categorias, basta preencher essa propriedade nos itens do catálogo para que o coletor exiba essas opções automaticamente. Por padrão (ou se o catálogo estiver vazio), a categoria padrão será **"Todas as Categorias"**.
+
 ### Opção A: Importação via Arquivo de Texto (CSV/TXT)
 O operador pode carregar um arquivo de texto no aplicativo através da tela de **Ajustes ➔ Importar Catálogo de Produtos**.
 * **Formato do Arquivo:** CSV delimitado por ponto e vírgula (`;`), codificado em **UTF-8** ou **ANSI**.
@@ -116,7 +119,33 @@ Ao finalizar o inventário, o operador clica em **Sincronizar Lote no ERP** para
 
 ---
 
-## 3. Controle de Ponto de Corte (Cutoff) e Kardex pelo ERP
+## 3. Importação da Lista de Lojas / Estabelecimentos do ERP
+
+Para que o operador possa selecionar a loja/filial correta no login (especialmente se o ERP atende múltiplas lojas), o ERP pode disponibilizar a lista de estabelecimentos.
+
+> [!NOTE]
+> **Fluxo de Loja Única vs Múltiplas Lojas:**
+> Por padrão, se nenhuma loja for sincronizada/importada do ERP, o aplicativo inicia contendo apenas a loja padrão `"Depósito Geral"`. 
+> * **Cenário Loja Única:** Se a lista de lojas possuir apenas 1 estabelecimento, o dropdown de seleção de loja na tela de login será **ocultado automaticamente**, permitindo que o operador digite apenas seu nome para fazer o login de forma simplificada.
+> * **Cenário Múltiplas Lojas:** Assim que a lista for populada com 2 ou mais filiais via API, a tela de login exibirá automaticamente o dropdown para que o operador selecione em qual estabelecimento a contagem está sendo realizada.
+
+### Opção A: Carga de Lojas via Endpoint da API (JSON)
+O aplicativo pode consumir um endpoint HTTP do ERP para atualizar as filiais disponíveis no banco de dados local.
+* **Método:** `GET`
+* **Sugestão de URL:** `https://api.seu-erp.com.br/v1/lojas`
+* **Resposta Esperada (JSON Array de Strings):**
+  ```json
+  [
+    "Depósito Geral",
+    "Loja Centro",
+    "Loja Shopping",
+    "Loja Norte"
+  ]
+  ```
+
+---
+
+## 4. Controle de Ponto de Corte (Cutoff) e Kardex pelo ERP
 
 Uma das grandes responsabilidades do ERP ao receber as contagens físicas do coletor é realizar o controle de **Ponto de Corte** (Cutoff do inventário):
 
@@ -131,7 +160,7 @@ Uma das grandes responsabilidades do ERP ao receber as contagens físicas do col
 
 ---
 
-## 4. Fluxo do Inventário Cego (Blind Inventory)
+## 5. Fluxo do Inventário Cego (Blind Inventory)
 
 O **Amura Collector** é 100% compatível com Inventário Cego. 
 Quando o modo cego está ativado:

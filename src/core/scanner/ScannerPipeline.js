@@ -1,7 +1,19 @@
-import DuplicateReadGuard from './DuplicateReadGuard';
-import CooldownManager from './CooldownManager';
-import ScannerSession from './ScannerSession';
 import { ScannerStateMachine, ScannerState, ScannerEvent } from './state';
+import { 
+  PipelineExecutor, 
+  PipelineContext, 
+  PipelineResult,
+  PipelineEvent 
+} from './pipeline';
+
+import DuplicateReadGuard from './pipeline/guards/DuplicateReadGuard';
+import CooldownGuard from './pipeline/guards/CooldownGuard';
+import BarcodeValidator from './pipeline/validators/BarcodeValidator';
+import ChecksumValidator from './pipeline/validators/ChecksumValidator';
+import BusinessValidator from './pipeline/validators/BusinessValidator';
+
+import HistoryService from '../../services/history/HistoryService';
+import FeedbackService from '../../services/feedback/FeedbackService';
 
 export const ScannerPipelineEvents = ScannerEvent;
 
@@ -10,18 +22,34 @@ export default class ScannerPipeline {
     this.onEvent = onEvent;
     
     this.fsm = new ScannerStateMachine(ScannerState.INITIALIZING);
-    
     this.fsm.subscribe((event, state, payload) => {
-      // Re-emit FSM events upwards to the old listener (React hook)
       if (this.onEvent && event === ScannerEvent.STATE_CHANGED) {
         this.onEvent(state, payload);
       }
     });
+
+    // Guards
+    this.duplicateGuard = new DuplicateReadGuard(1000);
+    this.cooldownGuard = new CooldownGuard();
     
-    this.guard = new DuplicateReadGuard(1000);
-    this.cooldown = new CooldownManager(500);
-    this.session = new ScannerSession();
-    
+    // Configura estágios fixos
+    this.businessValidator = new BusinessValidator(null); // Será injetado dinamicamente
+
+    this.executor = new PipelineExecutor();
+    this.executor
+      .addStage(this.cooldownGuard)
+      .addStage(this.duplicateGuard)
+      .addStage(new BarcodeValidator())
+      .addStage(new ChecksumValidator())
+      .addStage(this.businessValidator);
+
+    // Escuta finalização do pipeline para gravar histórico e feedback
+    this.executor.subscribe((event, context) => {
+      if (event === PipelineEvent.PIPELINE_FINISHED) {
+        this._handlePipelineFinished(context);
+      }
+    });
+
     this.isPaused = false;
   }
 
@@ -40,7 +68,8 @@ export default class ScannerPipeline {
 
   resume() {
     this.isPaused = false;
-    this.guard.reset();
+    this.duplicateGuard.reset();
+    this.cooldownGuard.cancel();
     this.transition(ScannerState.READY, null, 'User resumed');
   }
 
@@ -49,55 +78,64 @@ export default class ScannerPipeline {
       return;
     }
 
-    // Duplicate Check
-    if (this.guard.shouldIgnore(code)) {
-      this.session.recordRead(code, 'DUPLICATED');
-      if (this.onEvent) this.onEvent(ScannerEvent.DUPLICATED, code); // Special isolated event not breaking FSM
-      return;
-    }
-
-    // Start Flow: READY -> DETECTING
+    // Autorização de início (StateMachine)
     if (!this.transition(ScannerState.DETECTING, { barcode: code }, 'Scan detected')) return;
+
+    // Atualiza o validador de negócio localmente se fornecido
+    this.businessValidator.setCallback(onValidate);
+
+    const context = new PipelineContext(code);
+    await this.executor.execute(context);
+  }
+
+  _handlePipelineFinished(context) {
+    // Stage 7: History Service
+    // Stage 8: Feedback Service
     
-    // DETECTING -> PROCESSING
-    if (!this.transition(ScannerState.PROCESSING, { barcode: code }, 'Validating')) return;
+    const { barcode, result, product, validation } = context;
+    const desc = product ? product.description : '';
+    const pid = product ? product.id : null;
+    const errorMsg = validation.errors.length > 0 ? validation.errors[0].message || validation.errors[0] : '';
 
-    try {
-      if (onValidate) {
-        const isValid = await onValidate(code);
-        if (isValid) {
-          this.session.recordRead(code, 'ACCEPTED');
-          this.transition(ScannerState.SUCCESS, { barcode: code }, 'Validation accepted');
-        } else {
-          this.session.recordRead(code, 'REJECTED');
-          this.transition(ScannerState.ERROR, { error: new Error("Validation rejected") }, 'Validation rejected');
-        }
-      } else {
-        // Assume valid if no validator provided
-        this.session.recordRead(code, 'ACCEPTED');
-        this.transition(ScannerState.SUCCESS, { barcode: code }, 'Auto-accepted');
-      }
-    } catch (err) {
-      this.session.recordRead(code, 'REJECTED');
-      this.transition(ScannerState.ERROR, { error: err }, 'Validation threw error');
-    }
-
-    // Enter Cooldown
-    if (this.isPaused) return;
-
-    if (this.state === ScannerState.SUCCESS) {
+    if (result === PipelineResult.SUCCESS) {
+      this.transition(ScannerState.PROCESSING, { barcode }, 'Processing success');
+      HistoryService.add(barcode, 'SUCCESS', pid, desc, 1);
+      FeedbackService.triggerSuccess();
+      this.transition(ScannerState.SUCCESS, { barcode }, 'Validation accepted');
+      
+      // Cooldown e Retorno
       this.transition(ScannerState.COOLDOWN, null, 'Start cooldown');
-    }
+      this.cooldownGuard.setCooldown(500);
+      setTimeout(() => this._returnToReady(), 500);
 
-    this.cooldown.startCooldown(() => {
-      if (!this.isPaused && (this.state === ScannerState.COOLDOWN || this.state === ScannerState.ERROR)) {
-        this.transition(ScannerState.READY, null, 'Cooldown finished');
-      }
-    }, this.state === ScannerState.ERROR ? 1000 : 500); // 1000ms cooldown for errors
+    } else if (result === PipelineResult.DUPLICATE) {
+      HistoryService.add(barcode, 'DUPLICATE', null, 'Leitura Duplicada', 1);
+      FeedbackService.triggerDuplicate();
+      if (this.onEvent) this.onEvent(ScannerEvent.DUPLICATED, barcode);
+      this._returnToReady();
+
+    } else if (result === PipelineResult.INVALID || result === PipelineResult.ERROR) {
+      this.transition(ScannerState.PROCESSING, { barcode }, 'Processing error');
+      HistoryService.add(barcode, 'ERROR', null, errorMsg, 1);
+      FeedbackService.triggerError();
+      this.transition(ScannerState.ERROR, { error: new Error(errorMsg) }, 'Validation rejected');
+      
+      // Cooldown estendido e Retorno
+      this.cooldownGuard.setCooldown(1000);
+      setTimeout(() => this._returnToReady(), 1000);
+    } else {
+      this._returnToReady();
+    }
+  }
+
+  _returnToReady() {
+    if (!this.isPaused && (this.state === ScannerState.COOLDOWN || this.state === ScannerState.ERROR || this.state === ScannerState.DETECTING)) {
+      this.transition(ScannerState.READY, null, 'Cooldown finished');
+    }
   }
 
   destroy() {
-    this.cooldown.cancel();
+    this.cooldownGuard.cancel();
     if (this.state !== ScannerState.STOPPED) {
       this.transition(ScannerState.STOPPED, null, 'Destroy called');
     }

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ScannerPipeline from '../core/scanner/ScannerPipeline';
 import { ScannerState, ScannerEvent } from '../core/scanner/state';
-import HistoryService from '../services/history/HistoryService';
 
 export function useScannerPipeline(onValidateScan) {
   const [pipelineState, setPipelineState] = useState(ScannerState.INITIALIZING);
@@ -16,15 +15,7 @@ export function useScannerPipeline(onValidateScan) {
   useEffect(() => {
     const pipeline = new ScannerPipeline((newState, payload) => {
       setPipelineState(newState);
-      
-      // Notify History Service based on events
-      if (newState === ScannerState.SUCCESS) {
-        HistoryService.add(payload?.barcode || 'unknown', 'SUCCESS', null, '', 1);
-      } else if (newState === ScannerState.ERROR) {
-        HistoryService.add(payload?.barcode || 'error', 'ERROR', null, payload?.error?.message || 'Error', 1);
-      } else if (newState === ScannerEvent.DUPLICATED) {
-        HistoryService.add(payload || 'duplicated', 'DUPLICATE', null, 'Leitura Duplicada', 1);
-      }
+      // Feedback e History agora são controlados autonomamente pelas camadas e eventos 
     });
     
     pipelineRef.current = pipeline;

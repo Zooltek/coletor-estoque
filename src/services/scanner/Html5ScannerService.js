@@ -10,6 +10,11 @@ export default class Html5ScannerService extends IScanner {
     this.lastScanned = { code: '', time: 0 };
   }
 
+  async initialize() {
+    // No-op for HTML5 before start
+  }
+
+
   async start(elementId, onScan) {
     if (this.isScanning) {
       return;
@@ -73,6 +78,20 @@ export default class Html5ScannerService extends IScanner {
         advanced: [{ zoom: level }]
       });
     }
+  }
+
+  async destroy() {
+    await this.stop();
+  }
+
+  async isTorchAvailable() {
+    const caps = this.getCapabilities();
+    return !!caps?.torch;
+  }
+
+  async isZoomAvailable() {
+    const caps = this.getCapabilities();
+    return !!caps?.zoom;
   }
 
   getCapabilities() {

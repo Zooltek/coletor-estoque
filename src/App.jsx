@@ -22,7 +22,7 @@ import {
 import { playSuccessBeep, playErrorBuzzer } from './components/SoundFeedback';
 
 import DeviceFrame from './components/DeviceFrame';
-import Scanner from './components/Scanner';
+import ScannerContainer from './components/scanner/ScannerContainer';
 import PalletModal from './components/PalletModal';
 import FileMerger from './components/FileMerger';
 import KardexDashboard from './components/KardexDashboard';
@@ -986,7 +986,7 @@ export default function App() {
                     {countMethod === 'scan' ? (
                       <div>
                         {cameraOpen ? (
-                          <Scanner 
+                          <ScannerContainer 
                             onScan={processBarcode}
                             onClose={() => setCameraOpen(false)}
                             isPaused={isPaused}

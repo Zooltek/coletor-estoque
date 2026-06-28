@@ -1,4 +1,8 @@
 export default class IScanner {
+  async initialize() {
+    throw new Error("initialize() not implemented");
+  }
+
   async start(elementId, onScan) {
     throw new Error("start() not implemented");
   }
@@ -15,11 +19,23 @@ export default class IScanner {
     throw new Error("resume() not implemented");
   }
 
-  async toggleTorch(on) {
-    throw new Error("toggleTorch() not implemented");
+  async destroy() {
+    throw new Error("destroy() not implemented");
   }
 
   async setZoom(level) {
     throw new Error("setZoom() not implemented");
+  }
+
+  async toggleTorch(on) {
+    throw new Error("toggleTorch() not implemented");
+  }
+
+  async isTorchAvailable() {
+    throw new Error("isTorchAvailable() not implemented");
+  }
+
+  async isZoomAvailable() {
+    throw new Error("isZoomAvailable() not implemented");
   }
 }

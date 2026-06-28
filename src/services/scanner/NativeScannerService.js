@@ -8,6 +8,11 @@ export default class NativeScannerService extends IScanner {
     this.listener = null;
   }
 
+  async initialize() {
+    // No-op for native
+  }
+
+
   async start(elementId, onScan) {
     if (this.isScanning) return;
 
@@ -79,6 +84,20 @@ export default class NativeScannerService extends IScanner {
     } catch (err) {
       console.error("Erro ao definir zoom nativo:", err);
     }
+  }
+
+  async destroy() {
+    await this.stop();
+  }
+
+  async isTorchAvailable() {
+    const caps = this.getCapabilities();
+    return !!caps?.torch;
+  }
+
+  async isZoomAvailable() {
+    const caps = this.getCapabilities();
+    return !!caps?.zoom;
   }
 
   getCapabilities() {

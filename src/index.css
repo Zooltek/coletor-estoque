@@ -2331,3 +2331,351 @@ body.barcode-scanner-active .scanner-frame {
   background: transparent !important;
   border-color: rgba(242, 101, 34, 0.4);
 }
+
+/* ==========================================================================
+   ESTILOS DO HUD PROFISSIONAL DO SCANNER (TELA CHEIA E MIRA)
+   ========================================================================== */
+
+.camera-scanner-container.professional-hud {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  background: rgba(14, 21, 36, 0.95);
+  transition: all 0.3s ease;
+}
+
+body.barcode-scanner-active .camera-scanner-container.professional-hud {
+  background: transparent !important;
+}
+
+/* 1. HUD Header */
+.scanner-hud-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  background: linear-gradient(180deg, rgba(14, 21, 36, 0.9) 0%, rgba(14, 21, 36, 0.5) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  z-index: 20;
+}
+
+.hud-header-left small, .hud-header-right small {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.hud-header-left h5 {
+  margin: 2px 0 0 0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hud-counter-val {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-primary);
+  text-shadow: 0 0 8px rgba(242, 101, 34, 0.4);
+}
+
+.btn-close-scanner-hud {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: all 0.2s ease;
+}
+
+.btn-close-scanner-hud:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+/* 2. Retícula de Mira / Overlay */
+.scanner-target-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 270px;
+  height: 140px;
+  pointer-events: none;
+  z-index: 10;
+  box-sizing: border-box;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+}
+
+.scanner-target-reticle.searching-blue {
+  border-color: rgba(242, 101, 34, 0.3);
+}
+
+.scanner-target-reticle.confirmed-green {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+  box-shadow: 0 0 25px rgba(34, 197, 94, 0.3);
+}
+
+.scanner-target-reticle.paused-yellow {
+  border-color: #eab308;
+  background: rgba(234, 179, 8, 0.05);
+}
+
+/* Cantoneiras da Mira */
+.scanner-target-reticle .corner {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-color: var(--color-primary);
+  border-style: solid;
+  transition: all 0.3s ease;
+}
+
+.scanner-target-reticle.searching-blue .corner {
+  border-color: var(--color-primary);
+}
+
+.scanner-target-reticle.confirmed-green .corner {
+  border-color: #22c55e;
+  width: 25px;
+  height: 25px;
+}
+
+.scanner-target-reticle.paused-yellow .corner {
+  border-color: #eab308;
+}
+
+.scanner-target-reticle .corner.top-left {
+  top: -4px;
+  left: -4px;
+  border-width: 4px 0 0 4px;
+  border-top-left-radius: 6px;
+}
+
+.scanner-target-reticle .corner.top-right {
+  top: -4px;
+  right: -4px;
+  border-width: 4px 4px 0 0;
+  border-top-right-radius: 6px;
+}
+
+.scanner-target-reticle .corner.bottom-left {
+  bottom: -4px;
+  left: -4px;
+  border-width: 0 0 4px 4px;
+  border-bottom-left-radius: 6px;
+}
+
+.scanner-target-reticle .corner.bottom-right {
+  bottom: -4px;
+  right: -4px;
+  border-width: 0 4px 4px 0;
+  border-bottom-right-radius: 6px;
+}
+
+.reticle-status-text {
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.scanner-target-reticle.confirmed-green .reticle-status-text {
+  background: #22c55e;
+  color: #fff;
+  border-color: #22c55e;
+}
+
+/* 3. Bottom HUD Card Wrapper */
+.scanner-hud-bottom {
+  padding: 16px;
+  background: linear-gradient(0deg, rgba(14, 21, 36, 0.95) 0%, rgba(14, 21, 36, 0.7) 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  z-index: 20;
+}
+
+/* 4. Feedback Card */
+.hud-feedback-card {
+  padding: 16px;
+  border-radius: 14px;
+  text-align: center;
+  transition: all 0.2s ease;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.hud-feedback-card.searching {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.hud-feedback-card.searching .loading-dots {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-muted);
+  animation: pulse 1.5s infinite;
+}
+
+.hud-feedback-card.searching p {
+  margin: 6px 0 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.hud-feedback-card.confirmed {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.1);
+}
+
+.hud-feedback-card.confirmed .feedback-check {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #22c55e;
+  letter-spacing: 0.5px;
+}
+
+.hud-feedback-card h4 {
+  margin: 4px 0;
+  font-size: 15px;
+  color: #fff;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud-feedback-card.confirmed .feedback-meta {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+
+/* 5. Manual Confirmation HUD Card */
+.hud-manual-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+.hud-prod-header h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #fff;
+  font-weight: 700;
+}
+
+.hud-prod-header small {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 2px;
+  display: block;
+}
+
+.hud-qty-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.hud-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.btn-confirm-hud {
+  flex: 1;
+  background: var(--color-primary);
+  border: none;
+  color: #fff;
+  padding: 10px 14px;
+  font-weight: 700;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-confirm-hud:hover {
+  filter: brightness(1.1);
+}
+
+.btn-cancel-hud {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 10px 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel-hud:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* Error HUD Style */
+.scanner-error-hud {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  right: 16px;
+  transform: translateY(-50%);
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 20px;
+  border-radius: 16px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+  z-index: 30;
+}
+
+.scanner-error-hud p {
+  color: #fca5a5;
+  font-size: 13px;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.btn-retry-hud {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  padding: 8px 20px;
+  font-weight: 700;
+  border-radius: 10px;
+  cursor: pointer;
+}

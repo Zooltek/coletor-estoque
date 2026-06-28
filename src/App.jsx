@@ -992,6 +992,16 @@ export default function App() {
                             isPaused={isPaused}
                             soundMuted={soundMuted}
                             onToggleMute={() => setSoundMuted(!soundMuted)}
+                            currentInventory={currentInventory}
+                            scannedProduct={scannedProduct}
+                            totalItemsCounted={totalItemsCounted}
+                            isBipagemMode={isBipagemMode}
+                            scanQty={scanQty}
+                            adjustQty={adjustQty}
+                            setScanQty={setScanQty}
+                            confirmCount={confirmCount}
+                            cancelCount={cancelCount}
+                            setPalletOpen={setPalletOpen}
                           />
                         ) : (
                           <div className="card-custom glassmorphism" style={{ margin: '16px', textAlign: 'center', padding: '30px' }}>
@@ -1034,7 +1044,7 @@ export default function App() {
                     )}
 
                     {/* PRODUTO SELECIONADO / MOSTRAR DETALHES (EDITAR CONTAGEM) */}
-                    {scannedProduct && (
+                    {scannedProduct && countMethod === 'type' && (
                       <div className="scanned-product-details animate-slide" style={{ margin: '16px', border: '1px solid var(--color-primary)' }}>
                         <div className="prod-details-main">
                           <h4 style={{ color: 'var(--color-primary)' }}>{scannedProduct.description}</h4>

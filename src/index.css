@@ -2679,3 +2679,173 @@ body.barcode-scanner-active .camera-scanner-container.professional-hud {
   border-radius: 10px;
   cursor: pointer;
 }
+
+/* Fullscreen Scanner HUD styles */
+.camera-scanner-container.professional-hud.fullscreen-scanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  z-index: 99999 !important;
+}
+
+/* Explicit high-contrast white text for HUD elements to be readable on dark HUD background in Light Theme */
+.professional-hud .scanner-hud-header h5,
+.professional-hud .scanner-hud-header span,
+.professional-hud .scanner-hud-header small,
+.professional-hud .scanner-hud-header button,
+.professional-hud .scanner-hud-bottom h4,
+.professional-hud .scanner-hud-bottom p,
+.professional-hud .scanner-hud-bottom span,
+.professional-hud .scanner-hud-bottom small,
+.professional-hud .scanner-hud-bottom label,
+.professional-hud .hud-manual-card h4,
+.professional-hud .hud-manual-card small,
+.professional-hud .hud-feedback-card h4,
+.professional-hud .hud-feedback-card p,
+.professional-hud .hud-feedback-card span {
+  color: #ffffff !important;
+}
+
+.professional-hud .scanner-hud-header small,
+.professional-hud .scanner-hud-header button,
+.professional-hud .scanner-hud-bottom small,
+.professional-hud .scanner-hud-bottom label,
+.professional-hud .hud-manual-card small,
+.professional-hud .hud-feedback-card p {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.professional-hud .hud-counter-val {
+  color: var(--color-primary) !important;
+}
+
+/* Aggressive transparency rules for native camera view overlay */
+body.barcode-scanner-active,
+body.barcode-scanner-active #root,
+body.barcode-scanner-active .device-wrapper,
+body.barcode-scanner-active .device-container,
+body.barcode-scanner-active .device-screen,
+body.barcode-scanner-active .device-status-bar,
+body.barcode-scanner-active .device-app-content,
+body.barcode-scanner-active .device-home-bar,
+body.barcode-scanner-active .app-container,
+body.barcode-scanner-active .animate-fade,
+body.barcode-scanner-active .main-content,
+body.barcode-scanner-active .collect-screen-wrapper,
+body.barcode-scanner-active .collect-inputs-area,
+body.barcode-scanner-active .camera-scanner-container {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Flex-wrap layouts and text truncation to prevent column pushing in lists on mobile devices */
+.recent-item, .maint-card {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+.recent-item-left, .maint-left {
+  flex: 1 !important;
+  min-width: 0 !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-item-name, .maint-title {
+  display: block !important;
+  font-weight: bold;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+}
+
+.recent-item-qty, .maint-right {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* Responsive manual search page layouts */
+.manual-barcode-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 480px) {
+  .manual-barcode-row {
+    flex-direction: row;
+  }
+}
+
+.input-barcode {
+  width: 100% !important;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 14px;
+}
+
+.btn-enter-barcode {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 12px 18px;
+  font-weight: 600;
+  border-radius: 12px;
+  font-size: 14px;
+  width: 100%;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+/* Responsive search and select filters in maintenance dashboard */
+.search-box-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+@media (min-width: 480px) {
+  .search-box-row {
+    flex-direction: row;
+  }
+}
+
+.search-box-row input,
+.search-box-row select {
+  width: 100% !important;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 14px;
+}
+
+@media (min-width: 480px) {
+  .search-box-row input {
+    flex: 2 !important;
+  }
+  .search-box-row select {
+    flex: 1 !important;
+  }
+}

@@ -23,6 +23,7 @@ export default function Scanner({
   const [capabilities, setCapabilities] = useState(null);
   const [torchActive, setTorchActive] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackProduct, setFeedbackProduct] = useState(null);
@@ -114,7 +115,7 @@ export default function Scanner({
   };
 
   return (
-    <div className="camera-scanner-container professional-hud">
+    <div className={`camera-scanner-container professional-hud ${isFullscreen ? 'fullscreen-scanner' : ''}`}>
       {/* 1. CABEÇALHO HUD */}
       <div className="scanner-hud-header">
         <div className="hud-header-left">
@@ -197,6 +198,15 @@ export default function Scanner({
             title="Ligar/Desligar Lanterna"
           >
             🔦
+          </button>
+
+          <button 
+            type="button" 
+            className={`btn-scanner-icon fullscreen ${isFullscreen ? 'active' : ''}`}
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            title={isFullscreen ? "Sair da Tela Cheia" : "Ocupar Tela Cheia"}
+          >
+            {isFullscreen ? '🔍' : '📐'}
           </button>
         </div>
       )}

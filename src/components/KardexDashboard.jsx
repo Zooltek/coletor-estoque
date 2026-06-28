@@ -167,17 +167,18 @@ export default function KardexDashboard({ inventory, counts, catalog, mergedCoun
 
         <div className="form-group-endpoint">
           <label>Endpoint API de Contagem do ERP</label>
-          <div className="endpoint-input-row">
+          <div className="endpoint-input-container">
             <input
               type="text"
               value={apiEndpoint}
               onChange={(e) => setLocalApiEndpoint(e.target.value)}
               className="input-endpoint"
               placeholder="https://erp.sistema.com/api/contagem"
+              style={{ width: '100%', marginBottom: '10px' }}
             />
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn-save-endpoint" style={{ background: '#7a0c7b' }} onClick={handleTestConnection}>Testar Conexão</button>
-              <button className="btn-save-endpoint" onClick={handleSaveEndpoint}>Salvar</button>
+            <div className="endpoint-buttons-row" style={{ display: 'flex', gap: '8px', width: '100%' }}>
+              <button className="btn-save-endpoint" style={{ background: '#7a0c7b', flex: 1 }} onClick={handleTestConnection}>Testar Conexão</button>
+              <button className="btn-save-endpoint" style={{ flex: 1 }} onClick={handleSaveEndpoint}>Salvar</button>
             </div>
           </div>
         </div>

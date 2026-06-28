@@ -6,6 +6,7 @@ export default function Scanner({ onScan, onClose }) {
   const [cameraActive, setCameraActive] = useState(false);
   const qrRef = useRef(null);
   const scannerRef = useRef(null);
+  const lastScannedRef = useRef({ code: '', time: 0 });
 
   useEffect(() => {
     // Inicializa o leitor
@@ -23,7 +24,12 @@ export default function Scanner({ onScan, onClose }) {
             qrbox: { width: 250, height: 120 } // Retângulo mais achatado, ideal para código de barras de produtos
           },
           (decodedText) => {
-            // Sucesso na leitura
+            const now = Date.now();
+            // Ignora leituras repetidas do mesmo código num intervalo de 2 segundos
+            if (lastScannedRef.current.code === decodedText && (now - lastScannedRef.current.time) < 2000) {
+              return;
+            }
+            lastScannedRef.current = { code: decodedText, time: now };
             onScan(decodedText);
           },
           (errorMessage) => {

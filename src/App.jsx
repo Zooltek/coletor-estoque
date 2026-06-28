@@ -91,12 +91,70 @@ export default function App() {
   // Extrai categorias do catálogo de forma dinâmica
   const categoriesList = useMemo(() => {
     const unique = Array.from(new Set(catalog.map(p => p.category))).filter(Boolean);
-    return unique.length > 0 ? unique.sort() : ["Alimentos", "Bebidas", "Higiene", "Limpeza", "Eletrônicos", "Vestuário"];
+    return unique.length > 0 ? unique.sort() : []; // Vazio por padrão
   }, [catalog]);
 
-  // NOVO SETOR
+  // NOVO SETOR (Inicia vazio por padrão)
   const [newSectorName, setNewSectorName] = useState('');
-  const [sectors, setSectors] = useState(['Setor 01', 'Setor 02', 'Setor 03']);
+  const [sectors, setSectors] = useState([]);
+
+  // RELATÓRIO EM MODAL INTERNO
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+
+  // Consolidar contagens do inventário atual para o relatório
+  const reportCounts = useMemo(() => {
+    if (!currentInventory) return [];
+    return counts.filter(c => c.idInventario === currentInventory.id);
+  }, [counts, currentInventory]);
+
+  // Consolidar contagens por código de barras (desconsidera recontagem/conferência)
+  const consolidatedCountsForReport = useMemo(() => {
+    const consolidated = {};
+    reportCounts.filter(c => c.mode !== 'recontagem').forEach(c => {
+      consolidated[c.barcode] = (consolidated[c.barcode] || 0) + c.quantity;
+    });
+    return consolidated;
+  }, [reportCounts]);
+
+  // Consolidar recontagens (conferências)
+  const recountCountsForReport = useMemo(() => {
+    const recounts = {};
+    reportCounts.filter(c => c.mode === 'recontagem').forEach(c => {
+      recounts[c.barcode] = (recounts[c.barcode] || 0) + c.quantity;
+    });
+    return recounts;
+  }, [reportCounts]);
+
+  // Mapeia setores para o resumo por setor do relatório
+  const reportSectorSummary = useMemo(() => {
+    const summary = {};
+    reportCounts.forEach(c => {
+      const sec = c.sector || 'Sem Setor (Geral)';
+      if (!summary[sec]) {
+        summary[sec] = { totalItems: 0, distinctItems: new Set() };
+      }
+      summary[sec].totalItems += c.quantity;
+      summary[sec].distinctItems.add(c.barcode);
+    });
+    return summary;
+  }, [reportCounts]);
+
+  // Itens para o detalhamento da tabela
+  const reportItemsRows = useMemo(() => {
+    return catalog.map(p => {
+      const qtyColetada = consolidatedCountsForReport[p.barcode] || 0;
+      const qtyRecount = recountCountsForReport[p.barcode] || 0;
+      return {
+        ...p,
+        qtyColetada,
+        qtyRecount
+      };
+    }).filter(row => row.qtyColetada > 0 || row.qtyRecount > 0);
+  }, [catalog, consolidatedCountsForReport, recountCountsForReport]);
+
+  const reportTotalFisico = useMemo(() => {
+    return reportItemsRows.reduce((acc, row) => acc + row.qtyColetada, 0);
+  }, [reportItemsRows]);
 
   const barcodeInputRef = useRef(null);
 
@@ -118,25 +176,26 @@ export default function App() {
         setSectors(parsed);
         setActiveSector(parsed[0] || '');
       } else {
-        const defaultSectors = ['Setor 01', 'Setor 02', 'Setor 03'];
+        const defaultSectors = [];
         setSectors(defaultSectors);
-        setActiveSector(defaultSectors[0]);
+        setActiveSector('');
         localStorage.setItem(`sc_sectors_${currentInventory.id}`, JSON.stringify(defaultSectors));
       }
     } else {
-      setSectors(['Setor 01', 'Setor 02', 'Setor 03']);
-      setActiveSector('Setor 01');
+      setSectors([]);
+      setActiveSector('');
     }
   }, [currentInventory]);
 
   // LOGIN FLOW
   const handleLogin = (e) => {
     e.preventDefault();
-    if (!operator.trim() || !store) return;
+    const activeStore = store || (stores && stores[0]) || 'Depósito Geral';
+    if (!operator.trim() || !activeStore) return;
     setOperator(operator.trim());
-    setStore(store);
+    setStore(activeStore);
     setOperatorState(operator.trim());
-    setStoreState(store);
+    setStoreState(activeStore);
     setIsLoggedIn(true);
     setActiveTab('dashboard');
   };
@@ -165,6 +224,7 @@ export default function App() {
     const activeInv = updated.find(i => i.id === inv.id);
     setCurrentInventory(activeInv);
     setActiveTab('collect');
+    setCameraOpen(true); // Abre a câmera automaticamente!
     
     // Configura filtros
     if (activeInv.categoryFilter) {
@@ -177,10 +237,12 @@ export default function App() {
     e.preventDefault();
     if (!newInvName.trim()) return;
 
+    const activeStore = store || (stores && stores[0]) || 'Depósito Geral';
+
     const newInv = {
       id: 'local-' + Date.now(),
       name: newInvName.trim(),
-      store: store,
+      store: activeStore,
       brandFilter: newInvBrand.trim(),
       categoryFilter: newInvCategory,
       createdAt: new Date().toISOString(),
@@ -195,6 +257,7 @@ export default function App() {
     setNewInvBrand('');
     setCurrentInventory(newInv);
     setActiveTab('collect');
+    setCameraOpen(true); // Abre a câmera automaticamente!
     alert(`Inventário "${newInv.name}" criado localmente e iniciado!`);
   };
 
@@ -552,15 +615,22 @@ export default function App() {
               />
             </div>
 
-            <div className="form-group">
-              <label>Selecione a Loja</label>
-              <select value={store} onChange={(e) => setStoreState(e.target.value)} required>
-                <option value="">-- Escolha a Loja --</option>
-                {stores.map((s, idx) => (
-                  <option key={idx} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
+            {stores.length > 1 ? (
+              <div className="form-group animate-slide">
+                <label>Selecione a Loja</label>
+                <select value={store} onChange={(e) => setStoreState(e.target.value)} required>
+                  <option value="">-- Escolha a Loja --</option>
+                  {stores.map((s, idx) => (
+                    <option key={idx} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="form-group" style={{ display: 'none' }}>
+                <label>Loja Ativa</label>
+                <input type="text" value={store || (stores[0] || 'Depósito Geral')} readOnly />
+              </div>
+            )}
 
             <div className="form-group" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
               <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -616,7 +686,7 @@ export default function App() {
           <div className="device-app-content">
             
             {/* TELA 1: DASHBOARD (SELECIONAR INVENTARIO) */}
-            {(!currentInventory || activeTab === 'dashboard') && (
+            {activeTab === 'dashboard' && (
               <div className="dashboard-screen animate-fade">
                 <div className="card-custom glassmorphism">
                   <div className="card-header-custom">
@@ -674,7 +744,7 @@ export default function App() {
                         ))}
                       </select>
                     </div>
-                    <button type="submit" className="btn-create-local">Criar e Iniciar Contagem</button>
+                    <button type="submit" className="btn-create-local" style={{ marginTop: '18px', width: '100%' }}>Criar e Iniciar Contagem</button>
                   </form>
                 </div>
 
@@ -733,47 +803,91 @@ export default function App() {
             )}
 
             {/* TELA 2: COLETAR (SCANNER & INPUT) */}
-            {currentInventory && activeTab === 'collect' && (
-              <div className="animate-fade">
-                
-                {/* BARRA DE STATUS DA CONTAGEM */}
-                <div className="collect-header-status" style={{ background: '#0e1524', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div className="status-left">
-                      <span>Setor: <strong>{activeSector}</strong></span>
+            {activeTab === 'collect' && (
+              !currentInventory ? (
+                <div className="card-custom glassmorphism animate-fade" style={{ margin: '20px', textAlign: 'center', padding: '40px' }}>
+                  <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📋</span>
+                  <h4 style={{ color: 'var(--color-primary)' }}>Nenhum Inventário Selecionado</h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px' }}>
+                    Você precisa selecionar um inventário existente ou criar um novo inventário avulso na aba <strong>Dashboard</strong> antes de continuar.
+                  </p>
+                  <button 
+                    className="btn-create-local" 
+                    style={{ marginTop: '20px', padding: '10px 20px', display: 'inline-block', width: 'auto' }}
+                    onClick={() => setActiveTab('dashboard')}
+                  >
+                    Ir para o Dashboard
+                  </button>
+                </div>
+              ) : (
+                <div className="animate-fade">
+                  
+                  {/* BARRA DE STATUS DA CONTAGEM */}
+                  <div className="collect-header-status" style={{ background: '#0e1524', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div className="status-left">
+                        <span>Setor: <strong>{activeSector || 'Sem Setor (Geral)'}</strong></span>
+                      </div>
+                      <div className="status-right">
+                        <span className={`mode-indicator ${isRecountMode ? 'recount' : 'normal'}`}>
+                          {isRecountMode ? 'CONFERÊNCIA (NÃO AGREGA)' : 'CONTAGEM ATIVA'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="status-right">
-                      <span className={`mode-indicator ${isRecountMode ? 'recount' : 'normal'}`}>
-                        {isRecountMode ? 'CONFERÊNCIA (NÃO AGREGA)' : 'CONTAGEM ATIVA'}
+                    
+                    {/* SINALIZAÇÃO DE CONTAGEM CEGA - DESTACADA E COM ALTO CONTRASTE */}
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      padding: '10px 14px', 
+                      background: isBlindCount ? 'rgba(242, 101, 34, 0.18)' : 'rgba(255,255,255,0.03)', 
+                      border: isBlindCount ? '2px solid #f26522' : '1px solid rgba(255,255,255,0.05)',
+                      borderRadius: '10px',
+                      marginTop: '8px',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <label style={{ 
+                        fontSize: '13px', 
+                        fontWeight: 'bold', 
+                        color: isBlindCount ? '#f26522' : 'var(--text-main)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        cursor: 'pointer' 
+                      }}>
+                        <input 
+                          type="checkbox" 
+                          checked={isBlindCount} 
+                          onChange={(e) => setIsBlindCount(e.target.checked)}
+                          style={{ cursor: 'pointer', width: '18px', height: '18px' }}
+                        />
+                        <span>Modo Contagem Cega (Sem validar catálogo)</span>
+                      </label>
+                      <span style={{ 
+                        fontSize: '11px', 
+                        backgroundColor: isBlindCount ? '#f26522' : 'rgba(255,255,255,0.05)', 
+                        color: isBlindCount ? '#fff' : 'var(--text-muted)', 
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        fontWeight: 'bold',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {isBlindCount ? 'ATIVO 👁️‍c' : 'DESATIVADO 📋'}
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                    <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={isBlindCount} 
-                        onChange={(e) => setIsBlindCount(e.target.checked)}
-                        style={{ cursor: 'pointer', width: '14px', height: '14px' }}
-                      />
-                      <span>Modo Contagem Cega (Sem validar catálogo)</span>
-                    </label>
-                    <span style={{ fontSize: '10px', color: isBlindCount ? 'var(--color-primary)' : 'var(--text-muted)', fontWeight: 'bold' }}>
-                      {isBlindCount ? 'CEGO 👁️‍🗨️' : 'VALIDAÇÃO 📋'}
-                    </span>
-                  </div>
-                </div>
 
-                {/* LEITOR DE CÂMERA ACIONADO */}
-                {cameraOpen && (
-                  <Scanner 
-                    onScan={(code) => {
-                      processBarcode(code);
-                      setCameraOpen(false);
-                    }}
-                    onClose={() => setCameraOpen(false)}
-                  />
-                )}
+                  {/* LEITOR DE CÂMERA ACIONADO */}
+                  {cameraOpen && (
+                    <Scanner 
+                      onScan={(code) => {
+                        processBarcode(code);
+                        // Mantém a câmera aberta para leituras contínuas!
+                      }}
+                      onClose={() => setCameraOpen(false)}
+                    />
+                  )}
 
                 {/* ENTRADAS E BOTÕES */}
                 <div className="collect-inputs-area">
@@ -877,11 +991,28 @@ export default function App() {
                   )}
                 </div>
               </div>
-            )}
+            )
+          )}
 
             {/* TELA 3: SETORIZAÇÃO */}
-            {currentInventory && activeTab === 'sectors' && (
-              <div className="sector-screen-wrapper animate-fade">
+            {activeTab === 'sectors' && (
+              !currentInventory ? (
+                <div className="card-custom glassmorphism animate-fade" style={{ margin: '20px', textAlign: 'center', padding: '40px' }}>
+                  <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📋</span>
+                  <h4 style={{ color: 'var(--color-primary)' }}>Nenhum Inventário Selecionado</h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px' }}>
+                    Você precisa selecionar um inventário existente ou criar um novo inventário avulso na aba <strong>Dashboard</strong> antes de continuar.
+                  </p>
+                  <button 
+                    className="btn-create-local" 
+                    style={{ marginTop: '20px', padding: '10px 20px', display: 'inline-block', width: 'auto' }}
+                    onClick={() => setActiveTab('dashboard')}
+                  >
+                    Ir para o Dashboard
+                  </button>
+                </div>
+              ) : (
+                <div className="sector-screen-wrapper animate-fade">
                 <div className="card-custom glassmorphism">
                   <div className="card-header-custom">
                     <h4>📍 Setorização da Contagem</h4>
@@ -906,7 +1037,13 @@ export default function App() {
 
                   <div className="sectors-list-container" style={{ marginTop: '16px' }}>
                     <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>Selecione o setor ativo para coleta:</label>
-                    {sectors.map((sec, i) => {
+                    {sectors.length === 0 ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 16px', fontSize: '12px', border: '1px dashed var(--border-color)', borderRadius: '10px' }}>
+                        Nenhum setor cadastrado. <br />
+                        <span style={{ fontSize: '10px', marginTop: '4px', display: 'block' }}>Cadastre um setor acima se desejar organizar sua contagem por gôndolas/corredores.</span>
+                      </div>
+                    ) : (
+                      sectors.map((sec, i) => {
                       const secCounts = activeInventoryCounts.filter(c => c.sector === sec);
                       const secTotal = secCounts.reduce((acc, c) => acc + c.quantity, 0);
                       return (
@@ -955,9 +1092,10 @@ export default function App() {
                           </div>
                         </div>
                       );
-                    })}
+                        })
+                      )}
+                    </div>
                   </div>
-                </div>
 
                 {/* CONTROLE DE RECONTAGEM */}
                 <div className="card-custom glassmorphism recount-toggle-card">
@@ -981,11 +1119,28 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            )}
+            )
+          )}
 
             {/* TELA 4: MANUTENÇÃO (CONSULTAR E REMOVER) */}
-            {currentInventory && activeTab === 'maint' && (
-              <div className="maintenance-screen animate-fade">
+            {activeTab === 'maint' && (
+              !currentInventory ? (
+                <div className="card-custom glassmorphism animate-fade" style={{ margin: '20px', textAlign: 'center', padding: '40px' }}>
+                  <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📋</span>
+                  <h4 style={{ color: 'var(--color-primary)' }}>Nenhum Inventário Selecionado</h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px' }}>
+                    Você precisa selecionar um inventário existente ou criar um novo inventário avulso na aba <strong>Dashboard</strong> antes de continuar.
+                  </p>
+                  <button 
+                    className="btn-create-local" 
+                    style={{ marginTop: '20px', padding: '10px 20px', display: 'inline-block', width: 'auto' }}
+                    onClick={() => setActiveTab('dashboard')}
+                  >
+                    Ir para o Dashboard
+                  </button>
+                </div>
+              ) : (
+                <div className="maintenance-screen animate-fade">
                 <div className="card-custom glassmorphism" style={{ marginBottom: '8px' }}>
                   <div className="card-header-custom">
                     <h4>🛠️ Manutenção de Contagem</h4>
@@ -1051,25 +1206,44 @@ export default function App() {
                   )}
                 </div>
               </div>
-            )}
+            )
+          )}
 
             {/* TELA 5: KARDEX & SINCRONIZAÇÃO (INTEGRAÇÃO COMPLETA) */}
-            {currentInventory && activeTab === 'kardex' && (
-              <KardexDashboard 
-                inventory={currentInventory}
-                counts={counts}
-                catalog={catalog}
-                mergedCounts={mergedCounts}
-                onClearLocalCounts={() => {
+            {activeTab === 'kardex' && (
+              !currentInventory ? (
+                <div className="card-custom glassmorphism animate-fade" style={{ margin: '20px', textAlign: 'center', padding: '40px' }}>
+                  <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>📋</span>
+                  <h4 style={{ color: 'var(--color-primary)' }}>Nenhum Inventário Selecionado</h4>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '8px' }}>
+                    Você precisa selecionar um inventário existente ou criar um novo inventário avulso na aba <strong>Dashboard</strong> antes de continuar.
+                  </p>
+                  <button 
+                    className="btn-create-local" 
+                    style={{ marginTop: '20px', padding: '10px 20px', display: 'inline-block', width: 'auto' }}
+                    onClick={() => setActiveTab('dashboard')}
+                  >
+                    Ir para o Dashboard
+                  </button>
+                </div>
+              ) : (
+                <KardexDashboard 
+                  inventory={currentInventory}
+                  counts={counts}
+                  catalog={catalog}
+                  mergedCounts={mergedCounts}
+                  onOpenReport={() => setReportModalOpen(true)}
+                  onClearLocalCounts={() => {
                   if (confirm("Deseja mesmo limpar as contagens locais desse inventário?")) {
                     setCounts(counts.filter(c => c.idInventario !== currentInventory.id));
                   }
                 }}
               />
+              )
             )}
 
             {/* TELA 6: CONFIGURAÇÕES */}
-            {currentInventory && activeTab === 'settings' && (
+            {activeTab === 'settings' && (
               <div className="settings-screen animate-fade">
                 
                 {/* IMPORTAR NOVO CATÁLOGO DE PRODUTOS */}
@@ -1196,6 +1370,115 @@ export default function App() {
               onConfirm={handlePalletConfirm}
               onClose={() => setPalletOpen(false)}
             />
+          )}
+
+          {/* VISUALIZAÇÃO DO RELATÓRIO PDF EM MODAL INTERNO */}
+          {reportModalOpen && currentInventory && (
+            <div id="print-report-modal" className="report-modal-backdrop">
+              <div className="report-modal-content">
+                <div className="report-modal-header no-print">
+                  <h3 style={{ margin: 0, color: 'var(--color-primary)' }}>Visualização do Relatório</h3>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      className="btn-maint-del" 
+                      style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '13px', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'all 0.2s' }}
+                      onClick={() => setReportModalOpen(false)}
+                    >
+                      ← Voltar ao App
+                    </button>
+                    <button 
+                      className="btn-create-local" 
+                      style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
+                      onClick={() => window.print()}
+                    >
+                      🖨️ Salvar PDF / Imprimir
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="report-print-body">
+                  <div className="header" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid #f26522', paddingBottom: '10px', marginBottom: '20px' }}>
+                    <div>
+                      <h1 style={{ margin: 0, color: '#f26522', fontSize: '24px' }}>Amura Collector</h1>
+                      <p style={{ margin: '3px 0 0 0', color: 'var(--text-muted)' }}>Relatório Executivo de Contagem de Estoque</p>
+                    </div>
+                    <div style={{ textAlign: 'right', fontSize: '12px', color: 'var(--text-muted)' }}>
+                      <strong>Data de Emissão:</strong> {new Date().toLocaleDateString('pt-BR')}<br />
+                      <strong>Hora:</strong> {new Date().toLocaleTimeString('pt-BR')}
+                    </div>
+                  </div>
+
+                  <div className="meta-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '15px', marginBottom: '20px', backgroundColor: 'rgba(255,255,255,0.01)', padding: '15px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <div className="meta-item"><strong>Inventário:</strong> {currentInventory.name}</div>
+                    <div className="meta-item"><strong>Loja:</strong> {currentInventory.store}</div>
+                    <div className="meta-item"><strong>Status:</strong> <span style={{ textTransform: 'uppercase', fontWeight: 'bold', color: 'var(--color-primary)' }}>{currentInventory.status}</span></div>
+                    <div className="meta-item"><strong>Criado em:</strong> {new Date(currentInventory.createdAt).toLocaleString('pt-BR')}</div>
+                    <div className="meta-item"><strong>Horário de Início:</strong> {currentInventory.startedAt ? new Date(currentInventory.startedAt).toLocaleString('pt-BR') : 'Não Iniciado'}</div>
+                    <div className="meta-item"><strong>Filtros:</strong> Categoria: {currentInventory.categoryFilter || 'Todas'}, Marca: {currentInventory.brandFilter || 'Todas'}</div>
+                  </div>
+
+                  <div className="summary-cards" style={{ display: 'flex', gap: '15px', marginBottom: '25px' }}>
+                    <div className="card" style={{ flex: 1, padding: '15px', background: 'rgba(242, 101, 34, 0.05)', borderLeft: '5px solid #f26522', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total de Peças Contadas</div>
+                      <div className="card-val" style={{ fontSize: '20px', fontWeight: 'bold', marginTop: '5px' }}>{reportTotalFisico} un</div>
+                    </div>
+                    <div className="card setores" style={{ flex: 1, padding: '15px', background: 'rgba(122, 12, 123, 0.05)', borderLeft: '5px solid #7a0c7b', borderRadius: '4px' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Setores Auditados</div>
+                      <div className="card-val" style={{ fontSize: '20px', fontWeight: 'bold', marginTop: '5px' }}>{Object.keys(reportSectorSummary).length} setores</div>
+                    </div>
+                  </div>
+
+                  <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', fontSize: '14px', marginTop: '24px' }}>Resumo de Contagem por Setor</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ background: '#7a0c7b', color: '#fff' }}>
+                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Setor</th>
+                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Variedade de Itens (SKUs)</th>
+                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Total de Peças Coletadas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.keys(reportSectorSummary).map(sec => (
+                        <tr key={sec} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><strong>{sec}</strong></td>
+                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>{reportSectorSummary[sec].distinctItems.size}</td>
+                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>{reportSectorSummary[sec].totalItems}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', fontSize: '14px', marginTop: '24px' }}>Detalhamento do Inventário</h3>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ background: '#7a0c7b', color: '#fff' }}>
+                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Código de Barras</th>
+                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Descrição</th>
+                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Marca / Categoria</th>
+                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Contagem Física</th>
+                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Recontagem (Conf.)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportItemsRows.map(row => (
+                        <tr key={row.barcode} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><code>{row.barcode}</code></td>
+                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}>{row.description}</td>
+                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><small>{row.brand} / {row.category}</small></td>
+                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}><strong>{row.qtyColetada}</strong></td>
+                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right', color: 'var(--text-muted)' }}>{row.qtyRecount || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="footer" style={{ marginTop: '50px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                    <p>Amura Collector - Sistema Profissional de Coleta de Dados Offline e Online para Inventários.</p>
+                    <p>&copy; 2026 - Auditoria de Estoques.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}

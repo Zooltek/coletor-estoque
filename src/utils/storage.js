@@ -24,7 +24,7 @@ export const initStorage = () => {
   }
 
   if (!localStorage.getItem(KEYS.STORES)) {
-    localStorage.setItem(KEYS.STORES, JSON.stringify(mockStores));
+    localStorage.setItem(KEYS.STORES, JSON.stringify(["Depósito Geral"]));
   }
 
   if (!localStorage.getItem(KEYS.COUNTS)) {

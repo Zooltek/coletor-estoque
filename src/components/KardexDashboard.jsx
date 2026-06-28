@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getSyncMode, setSyncMode, getApiEndpoint, setApiEndpoint } from '../utils/storage';
-import { exportToTXT, exportToCSV, printPDFReport } from '../utils/exporter';
+import { exportToTXT, exportToCSV } from '../utils/exporter';
 
-export default function KardexDashboard({ inventory, counts, catalog, mergedCounts, onClearLocalCounts }) {
+export default function KardexDashboard({ inventory, counts, catalog, mergedCounts, onClearLocalCounts, onOpenReport }) {
   const [syncMode, setLocalSyncMode] = useState(getSyncMode());
   const [apiEndpoint, setLocalApiEndpoint] = useState(getApiEndpoint());
   const [apiLogs, setApiLogs] = useState([]);
@@ -245,7 +245,7 @@ export default function KardexDashboard({ inventory, counts, catalog, mergedCoun
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
             <button 
               className="btn-action-kardex btn-secondary" 
-              onClick={() => printPDFReport(inventory, activeCounts, catalog)} 
+              onClick={onOpenReport} 
               disabled={activeCounts.length === 0}
               style={{ padding: '10px 4px', fontSize: '12px' }}
             >

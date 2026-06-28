@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import ScannerLayout from './ScannerLayout';
 import { useScanner } from '../../hooks/useScanner';
 import { useScannerPipeline } from '../../hooks/useScannerPipeline';
+import { useFeedback } from '../../hooks/useFeedback';
+import FeedbackService from '../../services/feedback/FeedbackService';
 
 export default function ScannerContainer({
   onScan, // Now acts as validator
@@ -22,6 +24,14 @@ export default function ScannerContainer({
 }) {
   const { pause, resume, stop } = useScanner();
   const { pipelineState, processScan, pausePipeline, resumePipeline } = useScannerPipeline(onScan);
+  
+  // Habilita/Desabilita sons do serviço com base na prop soundMuted
+  useEffect(() => {
+    FeedbackService.setSoundEnabled(!soundMuted);
+  }, [soundMuted]);
+
+  // Registra o hook de feedback visual e sonoro associado ao pipeline
+  useFeedback(pipelineState);
   
   const [scanHistory, setScanHistory] = useState([]);
 

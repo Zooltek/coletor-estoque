@@ -19,13 +19,14 @@ import {
   findProductByBarcode,
   resetAllStorage 
 } from './utils/storage';
-import { playSuccessBeep, playErrorBuzzer } from './components/SoundFeedback';
 
 import DeviceFrame from './components/DeviceFrame';
 import ScannerContainer from './components/scanner/ScannerContainer';
 import PalletModal from './components/PalletModal';
 import FileMerger from './components/FileMerger';
 import KardexDashboard from './components/KardexDashboard';
+import FeedbackService from './services/feedback/FeedbackService';
+import './App.css';
 
 export default function App() {
   // Inicializa o banco de dados local
@@ -335,7 +336,7 @@ export default function App() {
         setBarcodeInput('');
         
         if (!soundMuted) {
-          playSuccessBeep();
+          FeedbackService.triggerSuccess();
         }
 
         // Foca o input de digitação novamente apenas se estiver nesse modo
@@ -393,7 +394,7 @@ export default function App() {
           setScannedProduct(newTempProd);
           
           if (!soundMuted) {
-            playSuccessBeep();
+            FeedbackService.triggerSuccess();
           }
 
           if (countMethod === 'type') {
@@ -412,7 +413,7 @@ export default function App() {
         }
       } else {
         if (!soundMuted) {
-          playErrorBuzzer();
+          FeedbackService.triggerError();
         }
         
         // Abre prompt rápido ou permite registrar
@@ -453,7 +454,7 @@ export default function App() {
             setScannedProduct(newTempProd);
             
             if (!soundMuted) {
-              playSuccessBeep();
+              FeedbackService.triggerSuccess();
             }
 
             if (countMethod === 'type') {
@@ -499,7 +500,7 @@ export default function App() {
     setCounts(getCounts());
 
     if (!soundMuted) {
-      playSuccessBeep();
+      FeedbackService.triggerSuccess();
     }
 
     // Limpa estado de leitura e retoma câmera

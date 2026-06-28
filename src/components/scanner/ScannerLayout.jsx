@@ -4,6 +4,7 @@ import ScannerCameraArea from './ScannerCameraArea';
 import ScannerFooter from './ScannerFooter';
 import ScannerInfoCard from './ScannerInfoCard';
 import ScannerStatusChip from './ScannerStatusChip';
+import { ScanFeedback } from './feedback';
 import './scanner-professional.css';
 
 export default function ScannerLayout({
@@ -21,7 +22,8 @@ export default function ScannerLayout({
   cancelCount,
   history = [],
   showFeedback,
-  pipelineState
+  pipelineState,
+  errorMessage
 }) {
   return (
     <div className="scanner-professional-layout">
@@ -47,6 +49,12 @@ export default function ScannerLayout({
       </div>
 
       <ScannerCameraArea onScan={onScan} pipelineState={pipelineState} />
+
+      <ScanFeedback 
+        pipelineState={pipelineState} 
+        scannedProduct={scannedProduct} 
+        errorMessage={errorMessage}
+      />
 
       <ScannerFooter 
         scannedProduct={scannedProduct}

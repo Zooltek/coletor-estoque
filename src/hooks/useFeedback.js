@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import FeedbackService from '../services/feedback/FeedbackService';
-import { ScannerPipelineEvents } from '../core/scanner/ScannerPipeline';
+import { ScannerState, ScannerEvent } from '../core/scanner/state';
 
 export function useFeedback(pipelineState) {
   // Use a ref to keep track of previous state to detect edges
@@ -11,11 +11,11 @@ export function useFeedback(pipelineState) {
     
     // Only trigger if state actually changed to avoid double sounds on re-renders
     if (pipelineState !== prevState) {
-      if (pipelineState === 'SUCCESS' || pipelineState === ScannerPipelineEvents.ACCEPTED) {
+      if (pipelineState === ScannerState.SUCCESS) {
         FeedbackService.triggerSuccess();
-      } else if (pipelineState === 'ERROR' || pipelineState === ScannerPipelineEvents.REJECTED) {
+      } else if (pipelineState === ScannerState.ERROR) {
         FeedbackService.triggerError();
-      } else if (pipelineState === ScannerPipelineEvents.DUPLICATED) {
+      } else if (pipelineState === ScannerEvent.DUPLICATED) {
         FeedbackService.triggerDuplicate();
       }
     }

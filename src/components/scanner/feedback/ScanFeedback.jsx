@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import FeedbackAnimator from './FeedbackAnimator';
 import SuccessBanner from './SuccessBanner';
 import ErrorBanner from './ErrorBanner';
-import { ScannerPipelineEvents } from '../../../core/scanner/ScannerPipeline';
+import { ScannerState, ScannerEvent } from '../../../core/scanner/state';
 
 const ScanFeedback = React.memo(({ pipelineState, scannedProduct, errorMessage }) => {
   const [showSuccess, setShowSuccess] = useState(false);
@@ -12,22 +12,19 @@ const ScanFeedback = React.memo(({ pipelineState, scannedProduct, errorMessage }
 
   useEffect(() => {
     switch (pipelineState) {
-      case 'SUCCESS':
-      case ScannerPipelineEvents.ACCEPTED:
+      case ScannerState.SUCCESS:
         setShowSuccess(true);
         setOverlayClass('feedback-overlay-success');
         break;
-      case 'ERROR':
-      case ScannerPipelineEvents.REJECTED:
+      case ScannerState.ERROR:
         setShowError(true);
         setOverlayClass('feedback-overlay-error');
         break;
-      case ScannerPipelineEvents.DUPLICATED:
+      case ScannerEvent.DUPLICATED:
         setShowDuplicate(true);
         setOverlayClass('feedback-overlay-duplicate');
         break;
-      case 'READY':
-      case ScannerPipelineEvents.READY:
+      case ScannerState.READY:
         // Limpeza garantida
         setOverlayClass('');
         setShowSuccess(false);

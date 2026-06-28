@@ -5,13 +5,14 @@ import OverlayCorners from './OverlayCorners';
 import OverlayAnimation from './OverlayAnimation';
 import OverlayStatus from './OverlayStatus';
 import { useScanner } from '../../../hooks/useScanner';
+import { ScannerState } from '../../../core/scanner/state';
 import './scanner-overlay.css';
 
 export default function ScannerOverlay({ pipelineState }) {
   const { state: contextState } = useScanner();
   
   // Use pipelineState if provided, otherwise fallback to contextState
-  const visualState = pipelineState && pipelineState !== 'INITIALIZING' ? pipelineState : contextState;
+  const visualState = pipelineState && pipelineState !== ScannerState.INITIALIZING ? pipelineState : contextState;
 
   return (
     <div className="so-container">

@@ -1,14 +1,16 @@
 import React from 'react';
+import { ScannerState } from '../../../core/scanner/state';
 
 const OverlayStatus = React.memo(({ state }) => {
   const getStatusText = () => {
     switch (state) {
-      case 'INITIALIZING': return 'Inicializando câmera...';
-      case 'READY': return 'Posicione o código dentro da área';
-      case 'SCANNING': return 'Código detectado...';
-      case 'SUCCESS': return 'Leitura confirmada';
-      case 'ERROR': return 'Não foi possível ler';
-      case 'PAUSED': return 'Leitor pausado';
+      case ScannerState.INITIALIZING: return 'Inicializando câmera...';
+      case ScannerState.READY: return 'Posicione o código dentro da área';
+      case ScannerState.DETECTING: return 'Código detectado...';
+      case ScannerState.PROCESSING: return 'Processando...';
+      case ScannerState.SUCCESS: return 'Leitura confirmada';
+      case ScannerState.ERROR: return 'Não foi possível ler';
+      case ScannerState.PAUSED: return 'Leitor pausado';
       default: return '';
     }
   };

@@ -1,12 +1,14 @@
 import React from 'react';
+import { ScannerState } from '../../../core/scanner/state';
 
 const OverlayAnimation = React.memo(({ state, children }) => {
   const getAnimationClass = () => {
     switch (state) {
-      case 'READY': return 'anim-fade-in';
-      case 'SCANNING': return 'anim-pulse';
-      case 'SUCCESS': return 'anim-glow-success';
-      case 'ERROR': return 'anim-shake-error';
+      case ScannerState.READY: return 'anim-fade-in';
+      case ScannerState.DETECTING: 
+      case ScannerState.PROCESSING: return 'anim-pulse';
+      case ScannerState.SUCCESS: return 'anim-glow-success';
+      case ScannerState.ERROR: return 'anim-shake-error';
       default: return '';
     }
   };

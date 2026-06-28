@@ -1,23 +1,23 @@
 import React from 'react';
+import { ScannerState } from '../../../core/scanner/state';
 
 const ScannerStatusIndicator = React.memo(({ pipelineState }) => {
   let statusClass = 'status-ready'; // fallback/ready
   
   switch (pipelineState) {
-    case 'PROCESSING':
-    case 'COOLDOWN':
+    case ScannerState.DETECTING:
+    case ScannerState.PROCESSING:
+    case ScannerState.COOLDOWN:
       statusClass = 'status-processing';
       break;
-    case 'ERROR':
-    case 'REJECTED':
+    case ScannerState.ERROR:
       statusClass = 'status-error';
       break;
-    case 'PAUSED':
+    case ScannerState.PAUSED:
       statusClass = 'status-paused';
       break;
-    case 'READY':
-    case 'SUCCESS':
-    case 'ACCEPTED':
+    case ScannerState.READY:
+    case ScannerState.SUCCESS:
     default:
       statusClass = 'status-ready';
       break;

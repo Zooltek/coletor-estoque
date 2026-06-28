@@ -18,8 +18,10 @@ export default function ScannerLayout({
   scanQty,
   setScanQty,
   confirmCount,
+  cancelCount,
   history = [],
-  showFeedback
+  showFeedback,
+  pipelineState
 }) {
   return (
     <div className="scanner-professional-layout">
@@ -44,7 +46,7 @@ export default function ScannerLayout({
         </div>
       </div>
 
-      <ScannerCameraArea onScan={onScan} showFeedback={showFeedback} />
+      <ScannerCameraArea onScan={onScan} pipelineState={pipelineState} />
 
       <ScannerFooter 
         scannedProduct={scannedProduct}

@@ -32,12 +32,6 @@ export default class Html5ScannerService extends IScanner {
       },
       (decodedText) => {
         if (this.isPaused) return;
-
-        const now = Date.now();
-        if (this.lastScanned.code === decodedText && (now - this.lastScanned.time) < 2500) {
-          return;
-        }
-        this.lastScanned = { code: decodedText, time: now };
         onScan(decodedText);
       },
       (errorMessage) => {

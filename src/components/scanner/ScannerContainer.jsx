@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import ScannerLayout from './ScannerLayout';
 import { useScanner } from '../../hooks/useScanner';
+import { useScannerPipeline } from '../../hooks/useScannerPipeline';
 
 export default function ScannerContainer({
-  onScan,
+  onScan, // Now acts as validator
   onClose,
   isPaused,
   soundMuted,
@@ -20,29 +21,24 @@ export default function ScannerContainer({
   setPalletOpen
 }) {
   const { pause, resume, stop } = useScanner();
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackProduct, setFeedbackProduct] = useState(null);
+  const { pipelineState, processScan, pausePipeline, resumePipeline } = useScannerPipeline(onScan);
+  
   const [scanHistory, setScanHistory] = useState([]);
 
   useEffect(() => {
     if (isPaused) {
       pause();
+      pausePipeline();
     } else {
       resume();
+      resumePipeline();
     }
-  }, [isPaused, pause, resume]);
+  }, [isPaused, pause, resume, pausePipeline, resumePipeline]);
 
   // Track history for bipagem mode
   useEffect(() => {
     if (scannedProduct && isBipagemMode) {
-      setShowFeedback(true);
-      setFeedbackProduct(scannedProduct);
       setScanHistory(prev => [scannedProduct, ...prev].slice(0, 3));
-      
-      const timer = setTimeout(() => {
-        setShowFeedback(false);
-      }, 300);
-      return () => clearTimeout(timer);
     }
   }, [scannedProduct, isBipagemMode]);
 
@@ -60,7 +56,7 @@ export default function ScannerContainer({
 
   return (
     <ScannerLayout
-      onScan={onScan}
+      onScan={processScan} // Passing pipeline processing function instead of raw App processBarcode
       onClose={handleClose}
       soundMuted={soundMuted}
       onToggleMute={onToggleMute}
@@ -73,7 +69,7 @@ export default function ScannerContainer({
       confirmCount={handleConfirmCount}
       cancelCount={cancelCount}
       history={scanHistory}
-      showFeedback={showFeedback}
+      pipelineState={pipelineState}
     />
   );
 }

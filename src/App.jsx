@@ -307,7 +307,7 @@ export default function App() {
   // ENTRADA DE CÓDIGO DE BARRAS (SCANNER OU MANUAL)
   const processBarcode = (code) => {
     const cleanCode = code.trim();
-    if (!cleanCode) return;
+    if (!cleanCode) return false;
 
     const prod = findProductByBarcode(cleanCode);
 
@@ -344,6 +344,7 @@ export default function App() {
             barcodeInputRef.current?.focus();
           }, 50);
         }
+        return true;
       } else {
         // Modo Scanner/Digitação com confirmação manual (carrega e pausa scanner se for câmera)
         setScannedProduct(prod);
@@ -351,6 +352,7 @@ export default function App() {
         if (countMethod === 'scan') {
           setIsPaused(true);
         }
+        return true;
       }
     } else {
       // Produto não cadastrado
@@ -399,12 +401,14 @@ export default function App() {
               barcodeInputRef.current?.focus();
             }, 50);
           }
+          return true;
         } else {
           setScannedProduct(newTempProd);
           setScanQty(1);
           if (countMethod === 'scan') {
             setIsPaused(true);
           }
+          return true;
         }
       } else {
         if (!soundMuted) {
@@ -457,14 +461,17 @@ export default function App() {
                 barcodeInputRef.current?.focus();
               }, 50);
             }
+            return true;
           } else {
             setScannedProduct(newTempProd);
             setScanQty(1);
             if (countMethod === 'scan') {
               setIsPaused(true);
             }
+            return true;
           }
         }
+        return false;
       }
     }
   };

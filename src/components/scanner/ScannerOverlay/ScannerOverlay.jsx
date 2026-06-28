@@ -7,11 +7,11 @@ import OverlayStatus from './OverlayStatus';
 import { useScanner } from '../../../hooks/useScanner';
 import './scanner-overlay.css';
 
-export default function ScannerOverlay({ showFeedback }) {
-  const { state } = useScanner();
+export default function ScannerOverlay({ pipelineState }) {
+  const { state: contextState } = useScanner();
   
-  // Se houver feedback de bipagem externo, podemos forçar o estado para SUCCESS visualmente
-  const visualState = showFeedback ? 'SUCCESS' : state;
+  // Use pipelineState if provided, otherwise fallback to contextState
+  const visualState = pipelineState && pipelineState !== 'INITIALIZING' ? pipelineState : contextState;
 
   return (
     <div className="so-container">

@@ -70,13 +70,31 @@ export default function App() {
   const [scanQty, setScanQty] = useState(1);
   const [activeSector, setActiveSector] = useState('Setor 01');
   const [isRecountMode, setIsRecountMode] = useState(false);
+  
+  // Modos de contagem e estados adicionais do leitor
+  const [countMethod, setCountMethod] = useState(localStorage.getItem('sc_count_method') || 'scan'); // 'scan' | 'type'
+  const [isBipagemMode, setIsBipagemMode] = useState(localStorage.getItem('sc_bipagem_mode') !== 'false'); // default true
+  const [isPaused, setIsPaused] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(localStorage.getItem('sc_sound_muted') === 'true');
   const [isBlindCount, setIsBlindCount] = useState(localStorage.getItem('sc_blind_count') === 'true');
 
   useEffect(() => {
     localStorage.setItem('sc_blind_count', isBlindCount);
   }, [isBlindCount]);
 
-  const [cameraOpen, setCameraOpen] = useState(false);
+  useEffect(() => {
+    localStorage.setItem('sc_count_method', countMethod);
+  }, [countMethod]);
+
+  useEffect(() => {
+    localStorage.setItem('sc_bipagem_mode', isBipagemMode);
+  }, [isBipagemMode]);
+
+  useEffect(() => {
+    localStorage.setItem('sc_sound_muted', soundMuted);
+  }, [soundMuted]);
+
+  const [cameraOpen, setCameraOpen] = useState(localStorage.getItem('sc_count_method') !== 'type');
   const [palletOpen, setPalletOpen] = useState(false);
 
   // PESQUISA E CONSULTA (MANUTENÇÃO)
@@ -91,7 +109,10 @@ export default function App() {
   // Extrai categorias do catálogo de forma dinâmica
   const categoriesList = useMemo(() => {
     const unique = Array.from(new Set(catalog.map(p => p.category))).filter(Boolean);
-    return unique.length > 0 ? unique.sort() : []; // Vazio por padrão
+    if (!unique.includes('Geral')) {
+      unique.push('Geral');
+    }
+    return unique.sort();
   }, [catalog]);
 
   // NOVO SETOR (Inicia vazio por padrão)
@@ -224,7 +245,7 @@ export default function App() {
     const activeInv = updated.find(i => i.id === inv.id);
     setCurrentInventory(activeInv);
     setActiveTab('collect');
-    setCameraOpen(true); // Abre a câmera automaticamente!
+    setCameraOpen(countMethod === 'scan'); // Abre a câmera automaticamente se for escaneamento!
     
     // Configura filtros
     if (activeInv.categoryFilter) {
@@ -257,7 +278,7 @@ export default function App() {
     setNewInvBrand('');
     setCurrentInventory(newInv);
     setActiveTab('collect');
-    setCameraOpen(true); // Abre a câmera automaticamente!
+    setCameraOpen(countMethod === 'scan'); // Abre a câmera automaticamente se for escaneamento!
     alert(`Inventário "${newInv.name}" criado localmente e iniciado!`);
   };
 
@@ -292,40 +313,49 @@ export default function App() {
 
     if (prod) {
       // Produto encontrado
-      setScannedProduct(prod);
-      playSuccessBeep();
+      if (isBipagemMode) {
+        // Modo Bipagem: grava a contagem imediatamente (quantidade 1) e bipa
+        const countRecord = {
+          idInventario: currentInventory.id,
+          barcode: cleanCode,
+          quantity: 1,
+          sector: activeSector,
+          operator: operator,
+          mode: isRecountMode ? 'recontagem' : 'coleta'
+        };
 
-      // Grava a contagem no banco de dados offline
-      const countRecord = {
-        idInventario: currentInventory.id,
-        barcode: cleanCode,
-        quantity: parseFloat(scanQty) || 1,
-        sector: activeSector,
-        operator: operator,
-        mode: isRecountMode ? 'recontagem' : 'coleta'
-      };
+        const syncMode = getSyncMode();
+        if (syncMode === 'online') {
+          simulateRealTimeAPI(countRecord, prod.description);
+        }
 
-      // Simula Integração em Tempo Real via API se o modo for online
-      const syncMode = getSyncMode();
-      if (syncMode === 'online') {
-        simulateRealTimeAPI(countRecord, prod.description);
+        addCount(countRecord);
+        setCounts(getCounts());
+        setScannedProduct(prod);
+        setBarcodeInput('');
+        
+        if (!soundMuted) {
+          playSuccessBeep();
+        }
+
+        // Foca o input de digitação novamente apenas se estiver nesse modo
+        if (countMethod === 'type') {
+          setTimeout(() => {
+            barcodeInputRef.current?.focus();
+          }, 50);
+        }
+      } else {
+        // Modo Scanner/Digitação com confirmação manual (carrega e pausa scanner se for câmera)
+        setScannedProduct(prod);
+        setScanQty(1);
+        if (countMethod === 'scan') {
+          setIsPaused(true);
+        }
       }
-
-      addCount(countRecord);
-      setCounts(getCounts());
-      
-      // Reseta inputs mas mantém a descrição visível temporariamente
-      setBarcodeInput('');
-      
-      // Auto-foca o campo de código novamente
-      setTimeout(() => {
-        barcodeInputRef.current?.focus();
-      }, 50);
-
     } else {
       // Produto não cadastrado
       if (isBlindCount) {
-        // Modo Contagem Cega: registra o produto avulso automaticamente sem perguntar nada
+        // Modo Contagem Cega: registra o produto avulso automaticamente
         const newTempProd = {
           barcode: cleanCode,
           description: `Produto Avulso (EAN: ${cleanCode})`,
@@ -334,39 +364,53 @@ export default function App() {
           price: 0.0,
           stock: 0
         };
+
         // Adiciona temporário ao catálogo local
         const updatedCat = [newTempProd, ...catalog];
         setCatalog(updatedCat);
         setCatalogState(updatedCat);
 
-        // Prossegue com o registro da contagem
-        const countRecord = {
-          idInventario: currentInventory.id,
-          barcode: cleanCode,
-          quantity: parseFloat(scanQty) || 1,
-          sector: activeSector,
-          operator: operator,
-          mode: isRecountMode ? 'recontagem' : 'coleta'
-        };
+        if (isBipagemMode) {
+          const countRecord = {
+            idInventario: currentInventory.id,
+            barcode: cleanCode,
+            quantity: 1,
+            sector: activeSector,
+            operator: operator,
+            mode: isRecountMode ? 'recontagem' : 'coleta'
+          };
 
-        // Simula Integração em Tempo Real via API se o modo for online
-        const syncMode = getSyncMode();
-        if (syncMode === 'online') {
-          simulateRealTimeAPI(countRecord, newTempProd.description);
+          const syncMode = getSyncMode();
+          if (syncMode === 'online') {
+            simulateRealTimeAPI(countRecord, newTempProd.description);
+          }
+
+          addCount(countRecord);
+          setCounts(getCounts());
+          setBarcodeInput('');
+          setScannedProduct(newTempProd);
+          
+          if (!soundMuted) {
+            playSuccessBeep();
+          }
+
+          if (countMethod === 'type') {
+            setTimeout(() => {
+              barcodeInputRef.current?.focus();
+            }, 50);
+          }
+        } else {
+          setScannedProduct(newTempProd);
+          setScanQty(1);
+          if (countMethod === 'scan') {
+            setIsPaused(true);
+          }
         }
-
-        addCount(countRecord);
-        setCounts(getCounts());
-        setBarcodeInput('');
-        setScannedProduct(newTempProd);
-        playSuccessBeep();
-
-        // Auto-foca o campo de código novamente
-        setTimeout(() => {
-          barcodeInputRef.current?.focus();
-        }, 50);
       } else {
-        playErrorBuzzer();
+        if (!soundMuted) {
+          playErrorBuzzer();
+        }
+        
         // Abre prompt rápido ou permite registrar
         const desc = prompt("Produto não encontrado no catálogo! Digite uma descrição temporária se deseja coletar mesmo assim, ou cancele:");
         if (desc !== null) {
@@ -378,39 +422,103 @@ export default function App() {
             price: 0.0,
             stock: 0
           };
+
           // Adiciona temporário ao catálogo local
           const updatedCat = [newTempProd, ...catalog];
           setCatalog(updatedCat);
           setCatalogState(updatedCat);
 
-          // Prossegue com o registro da contagem
-          const countRecord = {
-            idInventario: currentInventory.id,
-            barcode: cleanCode,
-            quantity: parseFloat(scanQty) || 1,
-            sector: activeSector,
-            operator: operator,
-            mode: isRecountMode ? 'recontagem' : 'coleta'
-          };
+          if (isBipagemMode) {
+            const countRecord = {
+              idInventario: currentInventory.id,
+              barcode: cleanCode,
+              quantity: 1,
+              sector: activeSector,
+              operator: operator,
+              mode: isRecountMode ? 'recontagem' : 'coleta'
+            };
 
-          // Simula Integração em Tempo Real via API se o modo for online
-          const syncMode = getSyncMode();
-          if (syncMode === 'online') {
-            simulateRealTimeAPI(countRecord, newTempProd.description);
+            const syncMode = getSyncMode();
+            if (syncMode === 'online') {
+              simulateRealTimeAPI(countRecord, newTempProd.description);
+            }
+
+            addCount(countRecord);
+            setCounts(getCounts());
+            setBarcodeInput('');
+            setScannedProduct(newTempProd);
+            
+            if (!soundMuted) {
+              playSuccessBeep();
+            }
+
+            if (countMethod === 'type') {
+              setTimeout(() => {
+                barcodeInputRef.current?.focus();
+              }, 50);
+            }
+          } else {
+            setScannedProduct(newTempProd);
+            setScanQty(1);
+            if (countMethod === 'scan') {
+              setIsPaused(true);
+            }
           }
-
-          addCount(countRecord);
-          setCounts(getCounts());
-          setBarcodeInput('');
-          setScannedProduct(newTempProd);
-          playSuccessBeep();
-
-          // Auto-foca o campo de código novamente
-          setTimeout(() => {
-            barcodeInputRef.current?.focus();
-          }, 50);
         }
       }
+    }
+  };
+
+  // CONFIRMAR E GRAVAR A CONTAGEM (Modo Scanner e Modo Digitação com Confirmação)
+  const confirmCount = () => {
+    if (!currentInventory || !scannedProduct) return;
+
+    const countRecord = {
+      idInventario: currentInventory.id,
+      barcode: scannedProduct.barcode,
+      quantity: parseFloat(scanQty) || 1,
+      sector: activeSector,
+      operator: operator,
+      mode: isRecountMode ? 'recontagem' : 'coleta'
+    };
+
+    // Simula Integração em Tempo Real via API se o modo for online
+    const syncMode = getSyncMode();
+    if (syncMode === 'online') {
+      simulateRealTimeAPI(countRecord, scannedProduct.description);
+    }
+
+    addCount(countRecord);
+    setCounts(getCounts());
+
+    if (!soundMuted) {
+      playSuccessBeep();
+    }
+
+    // Limpa estado de leitura e retoma câmera
+    setScannedProduct(null);
+    setScanQty(1);
+    setBarcodeInput('');
+    setIsPaused(false);
+
+    if (countMethod === 'type') {
+      setTimeout(() => {
+        barcodeInputRef.current?.focus();
+      }, 50);
+    }
+  };
+
+  // CANCELAR A CONTAGEM ATUAL (Modo Scanner e Modo Digitação com Confirmação)
+  const cancelCount = () => {
+    setScannedProduct(null);
+    setScanQty(1);
+    setBarcodeInput('');
+    setIsPaused(false);
+
+    if (countMethod === 'type') {
+      setTimeout(() => {
+        barcodeInputRef.current?.focus();
+      }, 50);
     }
   };
 
@@ -820,42 +928,45 @@ export default function App() {
                   </button>
                 </div>
               ) : (
-                <div className="animate-fade">
+                <div className="animate-fade" style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 120px)' }}>
                   
                   {/* BARRA DE STATUS DA CONTAGEM */}
-                  <div className="collect-header-status" style={{ background: '#0e1524', flexDirection: 'column', gap: '6px', alignItems: 'stretch' }}>
+                  <div className="collect-header-status detailed">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div className="status-left">
                         <span>Setor: <strong>{activeSector || 'Sem Setor (Geral)'}</strong></span>
                       </div>
                       <div className="status-right">
                         <span className={`mode-indicator ${isRecountMode ? 'recount' : 'normal'}`}>
-                          {isRecountMode ? 'CONFERÊNCIA (NÃO AGREGA)' : 'CONTAGEM ATIVA'}
+                          {isRecountMode ? 'CONFERÊNCIA' : 'CONTAGEM ATIVA'}
                         </span>
                       </div>
                     </div>
+
+                    {/* CONTROLE DE BIPAGEM CONTÍNUA */}
+                    <div className="bipagem-toggle-row">
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--text-main)' }}>
+                        Contagem por bipagem (Auto-salvar)
+                      </span>
+                      <label className="switch-custom">
+                        <input 
+                          type="checkbox" 
+                          checked={isBipagemMode} 
+                          onChange={(e) => {
+                            setIsBipagemMode(e.target.checked);
+                            // Reseta pausas se desativar
+                            if (e.target.checked) {
+                              setIsPaused(false);
+                            }
+                          }}
+                        />
+                        <span className="slider-custom"></span>
+                      </label>
+                    </div>
                     
-                    {/* SINALIZAÇÃO DE CONTAGEM CEGA - DESTACADA E COM ALTO CONTRASTE */}
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      padding: '10px 14px', 
-                      background: isBlindCount ? 'rgba(242, 101, 34, 0.18)' : 'rgba(255,255,255,0.03)', 
-                      border: isBlindCount ? '2px solid #f26522' : '1px solid rgba(255,255,255,0.05)',
-                      borderRadius: '10px',
-                      marginTop: '8px',
-                      transition: 'all 0.2s ease'
-                    }}>
-                      <label style={{ 
-                        fontSize: '13px', 
-                        fontWeight: 'bold', 
-                        color: isBlindCount ? '#f26522' : 'var(--text-main)', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '8px', 
-                        cursor: 'pointer' 
-                      }}>
+                    {/* SINALIZAÇÃO DE CONTAGEM CEGA */}
+                    <div className={`blind-count-container ${isBlindCount ? 'active' : ''}`}>
+                      <label className={`blind-count-label ${isBlindCount ? 'active' : ''}`}>
                         <input 
                           type="checkbox" 
                           checked={isBlindCount} 
@@ -864,131 +975,210 @@ export default function App() {
                         />
                         <span>Modo Contagem Cega (Sem validar catálogo)</span>
                       </label>
-                      <span style={{ 
-                        fontSize: '11px', 
-                        backgroundColor: isBlindCount ? '#f26522' : 'rgba(255,255,255,0.05)', 
-                        color: isBlindCount ? '#fff' : 'var(--text-muted)', 
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontWeight: 'bold',
-                        letterSpacing: '0.5px'
-                      }}>
-                        {isBlindCount ? 'ATIVO 👁️‍c' : 'DESATIVADO 📋'}
+                      <span className={`blind-count-badge ${isBlindCount ? 'active' : ''}`}>
+                        {isBlindCount ? 'ATIVO 👁️ Cega' : 'DESATIVADO 📋'}
                       </span>
                     </div>
                   </div>
 
-                  {/* LEITOR DE CÂMERA ACIONADO */}
-                  {cameraOpen && (
-                    <Scanner 
-                      onScan={(code) => {
-                        processBarcode(code);
-                        // Mantém a câmera aberta para leituras contínuas!
-                      }}
-                      onClose={() => setCameraOpen(false)}
-                    />
-                  )}
-
-                {/* ENTRADAS E BOTÕES */}
-                <div className="collect-inputs-area">
-                  <div className="scan-buttons-row">
-                    <button className="btn-scan-trigger" onClick={() => setCameraOpen(true)}>
-                      📷 Usar Câmera do Celular
-                    </button>
-                    <button className="btn-pallet-trigger" title="Contagem de Pallets" onClick={() => setPalletOpen(true)}>
-                      📦
-                    </button>
-                  </div>
-
-                  {/* DIGITAÇÃO MANUAL OU SCANNER FIO/BLUETOOTH */}
-                  <form onSubmit={handleBarcodeSubmit} className="manual-barcode-row">
-                    <input
-                      type="text"
-                      ref={barcodeInputRef}
-                      placeholder="Código de Barras ou EAN"
-                      value={barcodeInput}
-                      onChange={(e) => setBarcodeInput(e.target.value)}
-                      className="input-barcode"
-                      autoFocus
-                    />
-                    <button type="submit" className="btn-enter-barcode">OK</button>
-                  </form>
-
-                  {/* PRODUTO SELECIONADO / MOSTRAR DETALHES */}
-                  {scannedProduct && (
-                    <div className="scanned-product-details animate-slide">
-                      <div className="prod-details-main">
-                        <h4>{scannedProduct.description}</h4>
-                        <div className="prod-details-meta">
-                          EAN: {scannedProduct.barcode} • Marca: {scannedProduct.brand} • Cat: {scannedProduct.category}
-                        </div>
-                      </div>
-
-                      {/* EDITAR QUANTIDADE E MULTIPLICADORES RÁPIDOS */}
-                      <div className="qty-adjuster-row">
-                        <div className="qty-input-box">
-                          <button type="button" className="btn-qty-adj" onClick={() => adjustQty(-1)}>-</button>
-                          <input
-                            type="number"
-                            min="1"
-                            value={scanQty}
-                            onChange={(e) => setScanQty(Math.max(1, parseFloat(e.target.value) || 1))}
-                            className="input-qty"
+                  {/* LEITOR DE CÂMERA OU DIGITAÇÃO */}
+                  <div style={{ flex: 1 }}>
+                    {countMethod === 'scan' ? (
+                      <div>
+                        {cameraOpen ? (
+                          <Scanner 
+                            onScan={processBarcode}
+                            onClose={() => setCameraOpen(false)}
+                            isPaused={isPaused}
+                            soundMuted={soundMuted}
+                            onToggleMute={() => setSoundMuted(!soundMuted)}
                           />
-                          <button type="button" className="btn-qty-adj" onClick={() => adjustQty(1)}>+</button>
+                        ) : (
+                          <div className="card-custom glassmorphism" style={{ margin: '16px', textAlign: 'center', padding: '30px' }}>
+                            <span style={{ fontSize: '36px', display: 'block', marginBottom: '12px' }}>📷</span>
+                            <h5>Câmera do Leitor Desativada</h5>
+                            <button 
+                              className="btn-scan-trigger" 
+                              style={{ marginTop: '16px', width: '100%' }} 
+                              onClick={() => setCameraOpen(true)}
+                            >
+                              📷 Ativar Câmera do Celular
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="collect-inputs-area" style={{ marginTop: '10px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+                          Código do Produto
+                        </label>
+                        <form 
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            processBarcode(barcodeInput);
+                          }} 
+                          className="manual-barcode-row"
+                        >
+                          <input
+                            type="text"
+                            ref={barcodeInputRef}
+                            placeholder="Código de barras ou código interno"
+                            value={barcodeInput}
+                            onChange={(e) => setBarcodeInput(e.target.value)}
+                            className="input-barcode"
+                            autoFocus
+                          />
+                          <button type="submit" className="btn-enter-barcode">Pesquisar produto</button>
+                        </form>
+                      </div>
+                    )}
+
+                    {/* PRODUTO SELECIONADO / MOSTRAR DETALHES (EDITAR CONTAGEM) */}
+                    {scannedProduct && (
+                      <div className="scanned-product-details animate-slide" style={{ margin: '16px', border: '1px solid var(--color-primary)' }}>
+                        <div className="prod-details-main">
+                          <h4 style={{ color: 'var(--color-primary)' }}>{scannedProduct.description}</h4>
+                          <div className="prod-details-meta" style={{ marginTop: '4px' }}>
+                            <strong>EAN:</strong> {scannedProduct.barcode} <br />
+                            <strong>Marca:</strong> {scannedProduct.brand} • <strong>Cat:</strong> {scannedProduct.category}
+                          </div>
                         </div>
 
-                        <div className="multipliers-grid">
-                          <button type="button" className="btn-mult" onClick={() => setScanQty(5)}>+5</button>
-                          <button type="button" className="btn-mult" onClick={() => setScanQty(10)}>+10</button>
-                          <button type="button" className="btn-mult" onClick={() => setScanQty(50)}>+50</button>
-                          <button type="button" className="btn-mult" onClick={() => setScanQty(100)}>+100</button>
+                        {/* EDITAR QUANTIDADE E MULTIPLICADORES RÁPIDOS */}
+                        <div className="qty-adjuster-row" style={{ marginTop: '12px', flexDirection: 'column', gap: '12px' }}>
+                          <label style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-muted)' }}>
+                            Informe a Quantidade Coletada:
+                          </label>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <div className="qty-input-box" style={{ flex: 1 }}>
+                              <button type="button" className="btn-qty-adj" onClick={() => adjustQty(-1)}>-</button>
+                              <input
+                                type="number"
+                                min="1"
+                                value={scanQty}
+                                onChange={(e) => setScanQty(Math.max(1, parseFloat(e.target.value) || 1))}
+                                className="input-qty"
+                                style={{ fontSize: '16px', fontWeight: 'bold', textAlign: 'center' }}
+                              />
+                              <button type="button" className="btn-qty-adj" onClick={() => adjustQty(1)}>+</button>
+                            </div>
+
+                            <button 
+                              type="button" 
+                              className="btn-pallet-trigger" 
+                              title="Calculadora de Pallets" 
+                              onClick={() => setPalletOpen(true)}
+                              style={{ height: '42px', width: '42px', borderRadius: '10px' }}
+                            >
+                              📦
+                            </button>
+                          </div>
+
+                          {!isBipagemMode && (
+                            <>
+                              <div className="multipliers-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                                <button type="button" className="btn-mult" onClick={() => setScanQty(prev => prev + 5)}>+5</button>
+                                <button type="button" className="btn-mult" onClick={() => setScanQty(prev => prev + 10)}>+10</button>
+                                <button type="button" className="btn-mult" onClick={() => setScanQty(prev => prev + 50)}>+50</button>
+                                <button type="button" className="btn-mult" onClick={() => setScanQty(prev => prev + 100)}>+100</button>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                                <button 
+                                  type="button" 
+                                  onClick={confirmCount} 
+                                  className="btn-login"
+                                  style={{ flex: 1, margin: 0, padding: '10px', fontSize: '14px', background: 'var(--color-primary)' }}
+                                >
+                                  💾 Confirmar Contagem
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={cancelCount} 
+                                  className="btn-maint-del"
+                                  style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '10px 16px', borderRadius: '12px' }}
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* TOTALIZADOR */}
-                <div className="counting-stats-bar">
-                  <div className="stat-box">
-                    <small>Físico Contado</small>
-                    <span>{totalItemsCounted} un</span>
+                    )}
                   </div>
-                  <div className="stat-box">
-                    <small>SKUs Únicos</small>
-                    <span>{totalSKUsCounted} itens</span>
-                  </div>
-                  {totalRecountsCounted > 0 && (
-                    <div className="stat-box" style={{ color: '#c084fc' }}>
-                      <small>Recontagem (Conf.)</small>
-                      <span>{totalRecountsCounted} un</span>
-                    </div>
-                  )}
-                </div>
 
-                {/* HISTÓRICO DAS ÚLTIMAS 5 LEITURAS */}
-                <div className="recent-scans-list">
-                  <div className="recent-title">Últimas Coletas Coletadas</div>
-                  {activeInventoryCounts.slice(0, 5).map((item) => {
-                    const prod = catalog.find(p => p.barcode === item.barcode);
-                    return (
-                      <div key={item.id} className={`recent-item ${item.mode === 'recontagem' ? 'recount-item' : ''} animate-slide`}>
-                        <div className="recent-item-left">
-                          <span className="recent-item-name">{prod ? prod.description : 'Produto Avulso'}</span>
-                          <span className="recent-item-code">EAN: {item.barcode} • Setor: {item.sector}</span>
-                        </div>
-                        <span className="recent-item-qty">
-                          {item.quantity} un
-                        </span>
+                  {/* TOTALIZADOR */}
+                  <div className="counting-stats-bar" style={{ marginTop: '16px' }}>
+                    <div className="stat-box">
+                      <small>Físico Contado</small>
+                      <span>{totalItemsCounted} un</span>
+                    </div>
+                    <div className="stat-box">
+                      <small>SKUs Únicos</small>
+                      <span>{totalSKUsCounted} itens</span>
+                    </div>
+                    {totalRecountsCounted > 0 && (
+                      <div className="stat-box" style={{ color: '#c084fc' }}>
+                        <small>Recontagem (Conf.)</small>
+                        <span>{totalRecountsCounted} un</span>
                       </div>
-                    );
-                  })}
-                  {activeInventoryCounts.length === 0 && (
-                    <div style={{ textAlign: 'center', color: '#475569', fontSize: '12px', marginTop: '20px' }}>
-                      Nenhum código coletado ainda neste inventário.
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  {/* HISTÓRICO DAS ÚLTIMAS 5 LEITURAS */}
+                  <div className="recent-scans-list" style={{ padding: '0 16px', marginBottom: '16px' }}>
+                    <div className="recent-title">Últimas Coletas Coletadas</div>
+                    {activeInventoryCounts.slice(0, 5).map((item) => {
+                      const prod = catalog.find(p => p.barcode === item.barcode);
+                      return (
+                        <div key={item.id} className={`recent-item ${item.mode === 'recontagem' ? 'recount-item' : ''} animate-slide`}>
+                          <div className="recent-item-left">
+                            <span className="recent-item-name">{prod ? prod.description : 'Produto Avulso'}</span>
+                            <span className="recent-item-code">EAN: {item.barcode} • Setor: {item.sector}</span>
+                          </div>
+                          <span className="recent-item-qty">
+                            {item.quantity} un
+                          </span>
+                        </div>
+                      );
+                    })}
+                    {activeInventoryCounts.length === 0 && (
+                      <div style={{ textAlign: 'center', color: '#475569', fontSize: '12px', marginTop: '20px' }}>
+                        Nenhum código coletado ainda neste inventário.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* FOOTER BAR FOR SELECTION OF METHOD */}
+                  <div className="scan-mode-footer-bar">
+                    <button 
+                      type="button"
+                      className={`btn-method-tab ${countMethod === 'type' ? 'active' : ''}`}
+                      onClick={() => {
+                        setCountMethod('type');
+                        setCameraOpen(false);
+                        setIsPaused(false);
+                        setScannedProduct(null);
+                        setTimeout(() => {
+                          barcodeInputRef.current?.focus();
+                        }, 50);
+                      }}
+                    >
+                      ⌨️ Digitar
+                    </button>
+                    <button 
+                      type="button"
+                      className={`btn-method-tab ${countMethod === 'scan' ? 'active' : ''}`}
+                      onClick={() => {
+                        setCountMethod('scan');
+                        setCameraOpen(true);
+                        setIsPaused(false);
+                        setScannedProduct(null);
+                      }}
+                    >
+                      🔍 Escanear
+                    </button>
                 </div>
               </div>
             )
@@ -1384,7 +1574,7 @@ export default function App() {
                       style={{ background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: '13px', padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color)', cursor: 'pointer', transition: 'all 0.2s' }}
                       onClick={() => setReportModalOpen(false)}
                     >
-                      ← Voltar ao App
+                      Sair
                     </button>
                     <button 
                       className="btn-create-local" 
@@ -1429,48 +1619,52 @@ export default function App() {
                   </div>
 
                   <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', fontSize: '14px', marginTop: '24px' }}>Resumo de Contagem por Setor</h3>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px', fontSize: '12px' }}>
-                    <thead>
-                      <tr style={{ background: '#7a0c7b', color: '#fff' }}>
-                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Setor</th>
-                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Variedade de Itens (SKUs)</th>
-                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Total de Peças Coletadas</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.keys(reportSectorSummary).map(sec => (
-                        <tr key={sec} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><strong>{sec}</strong></td>
-                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>{reportSectorSummary[sec].distinctItems.size}</td>
-                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>{reportSectorSummary[sec].totalItems}</td>
+                  <div className="report-table-container">
+                    <table style={{ borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: '#7a0c7b', color: '#fff' }}>
+                          <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Setor</th>
+                          <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Variedade de Itens (SKUs)</th>
+                          <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Total de Peças Coletadas</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {Object.keys(reportSectorSummary).map(sec => (
+                          <tr key={sec} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><strong>{sec}</strong></td>
+                            <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>{reportSectorSummary[sec].distinctItems.size}</td>
+                            <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>{reportSectorSummary[sec].totalItems}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
                   <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', fontSize: '14px', marginTop: '24px' }}>Detalhamento do Inventário</h3>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px', fontSize: '12px' }}>
-                    <thead>
-                      <tr style={{ background: '#7a0c7b', color: '#fff' }}>
-                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Código de Barras</th>
-                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Descrição</th>
-                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Marca / Categoria</th>
-                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Contagem Física</th>
-                        <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Recontagem (Conf.)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reportItemsRows.map(row => (
-                        <tr key={row.barcode} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><code>{row.barcode}</code></td>
-                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}>{row.description}</td>
-                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><small>{row.brand} / {row.category}</small></td>
-                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}><strong>{row.qtyColetada}</strong></td>
-                          <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right', color: 'var(--text-muted)' }}>{row.qtyRecount || '-'}</td>
+                  <div className="report-table-container">
+                    <table style={{ borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: '#7a0c7b', color: '#fff' }}>
+                          <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Código de Barras</th>
+                          <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Descrição</th>
+                          <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'left' }}>Marca / Categoria</th>
+                          <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Contagem Física</th>
+                          <th style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}>Recontagem (Conf.)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {reportItemsRows.map(row => (
+                          <tr key={row.barcode} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><code>{row.barcode}</code></td>
+                            <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}>{row.description}</td>
+                            <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px' }}><small>{row.brand} / {row.category}</small></td>
+                            <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right' }}><strong>{row.qtyColetada}</strong></td>
+                            <td style={{ border: '1px solid var(--border-color)', padding: '8px 10px', textAlign: 'right', color: 'var(--text-muted)' }}>{row.qtyRecount || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
 
                   <div className="footer" style={{ marginTop: '50px', fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
                     <p>Amura Collector - Sistema Profissional de Coleta de Dados Offline e Online para Inventários.</p>

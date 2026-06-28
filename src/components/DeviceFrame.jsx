@@ -6,9 +6,6 @@ export default function DeviceFrame({ children }) {
   return (
     <div className="device-wrapper">
       <div className="device-container">
-        {/* Notch / Câmera superior do celular */}
-        <div className="device-speaker"></div>
-        <div className="device-camera"></div>
         
         {/* Tela do celular */}
         <div className="device-screen">

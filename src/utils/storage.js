@@ -1,5 +1,4 @@
 // storage.js - Armazenamento Offline-first usando LocalStorage
-import { mockCatalog, mockStores } from '../data/mockCatalog';
 
 const KEYS = {
   CATALOG: 'sc_catalog',
@@ -16,7 +15,7 @@ const KEYS = {
 // Inicializador de dados padrões caso o storage esteja limpo
 export const initStorage = () => {
   if (!localStorage.getItem(KEYS.CATALOG)) {
-    localStorage.setItem(KEYS.CATALOG, JSON.stringify(mockCatalog));
+    localStorage.setItem(KEYS.CATALOG, JSON.stringify([]));
   }
 
   if (!localStorage.getItem(KEYS.INVENTORIES)) {
@@ -31,45 +30,9 @@ export const initStorage = () => {
     localStorage.setItem(KEYS.COUNTS, JSON.stringify([]));
   }
 
-  // Inicializa o Kardex fictício com algumas movimentações para demonstração
+  // Inicializa o Kardex vazio
   if (!localStorage.getItem(KEYS.KARDEX)) {
-    const now = new Date();
-    // Gera transações que ocorreram recentemente (para simulação de vendas durante a contagem)
-    const mockKardex = [
-      // Venda ocorrida há 10 minutos (produto 78910001)
-      {
-        id: "k-1",
-        barcode: "78910001", // Arroz Integral
-        type: "venda",
-        quantity: 2,
-        timestamp: new Date(now.getTime() - 10 * 60 * 1000).toISOString()
-      },
-      // Venda ocorrida há 5 minutos (produto 78910001)
-      {
-        id: "k-2",
-        barcode: "78910001", // Arroz Integral
-        type: "venda",
-        quantity: 3,
-        timestamp: new Date(now.getTime() - 5 * 60 * 1000).toISOString()
-      },
-      // Entrada ocorrida há 15 minutos (produto 78910002)
-      {
-        id: "k-3",
-        barcode: "78910002", // Feijão Preto
-        type: "entrada",
-        quantity: 20,
-        timestamp: new Date(now.getTime() - 15 * 60 * 1000).toISOString()
-      },
-      // Venda ocorrida há 1 minuto (produto 78930003)
-      {
-        id: "k-4",
-        barcode: "78930003", // Fone JBL
-        type: "venda",
-        quantity: 1,
-        timestamp: new Date(now.getTime() - 1 * 60 * 1000).toISOString()
-      }
-    ];
-    localStorage.setItem(KEYS.KARDEX, JSON.stringify(mockKardex));
+    localStorage.setItem(KEYS.KARDEX, JSON.stringify([]));
   }
 
   if (!localStorage.getItem(KEYS.SYNC_MODE)) {

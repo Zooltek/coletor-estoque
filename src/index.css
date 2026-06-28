@@ -1980,3 +1980,338 @@ input:focus, select:focus {
     margin: 1.5cm;
   }
 }
+
+/* ==========================================================================
+   ESTILOS ADICIONAIS - LEITOR DE CÓDIGO E CORREÇÕES CLARO/ESCURO
+   ========================================================================== */
+
+/* Barra de status de coleta detalhada */
+.collect-header-status.detailed {
+  background: #0e1524 !important;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.3s ease;
+}
+
+.light-theme .collect-header-status.detailed {
+  background: var(--bg-card) !important;
+}
+
+/* Container de Contagem Cega */
+.blind-count-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  margin-top: 8px;
+  transition: all 0.2s ease;
+}
+
+.blind-count-container.active {
+  background: rgba(242, 101, 34, 0.18);
+  border: 2px solid #f26522;
+}
+
+.light-theme .blind-count-container {
+  background: rgba(15, 23, 42, 0.03);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.light-theme .blind-count-container.active {
+  background: rgba(242, 101, 34, 0.1);
+  border: 2px solid #f26522;
+}
+
+/* Label Contagem Cega */
+.blind-count-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.blind-count-label.active {
+  color: #f26522;
+}
+
+/* Badge Contagem Cega */
+.blind-count-badge {
+  font-size: 11px;
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+}
+
+.blind-count-badge.active {
+  background-color: #f26522;
+  color: #fff;
+}
+
+.light-theme .blind-count-badge {
+  background-color: rgba(15, 23, 42, 0.06);
+  color: var(--text-muted);
+}
+
+.light-theme .blind-count-badge.active {
+  background-color: #f26522;
+  color: #fff;
+}
+
+/* Controles do Scanner (Zoom e Lanterna) */
+.scanner-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: -1px;
+}
+
+.light-theme .scanner-controls-row {
+  background: rgba(0, 0, 0, 0.04);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.btn-scanner-icon {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.light-theme .btn-scanner-icon {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--text-main);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.btn-scanner-icon:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.light-theme .btn-scanner-icon:hover {
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.btn-scanner-icon.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 10px rgba(242, 101, 34, 0.4);
+}
+
+.zoom-selector-group {
+  display: flex;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.light-theme .zoom-selector-group {
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.btn-zoom-option {
+  width: 38px;
+  height: 30px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border-radius: 15px;
+  transition: all 0.2s ease;
+}
+
+.btn-zoom-option.active {
+  background: var(--color-secondary);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(122, 12, 123, 0.3);
+}
+
+.btn-zoom-option:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Scanner Paused Overlay */
+.scanner-paused-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 15;
+  backdrop-filter: blur(4px);
+}
+
+.scanner-paused-overlay span {
+  font-weight: bold;
+  font-size: 14px;
+  color: var(--color-primary);
+  background: rgba(242, 101, 34, 0.1);
+  border: 1px solid rgba(242, 101, 34, 0.3);
+  padding: 8px 16px;
+  border-radius: 20px;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.98); opacity: 0.8; }
+  50% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(0.98); opacity: 0.8; }
+}
+
+/* Footer Tabs de Seleção de Leitor (Escanear / Digitar) */
+.scan-mode-footer-bar {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+
+.btn-method-tab {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  background: transparent;
+  color: var(--color-secondary);
+  border: 2px solid var(--color-secondary);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.btn-method-tab.active {
+  background: var(--color-secondary);
+  color: #fff;
+}
+
+.btn-method-tab:hover {
+  background: rgba(122, 12, 123, 0.08);
+}
+
+.btn-method-tab.active:hover {
+  background: var(--color-secondary);
+  filter: brightness(1.1);
+}
+
+/* Seção de Controles de Bipagem Rápida no Topo */
+.bipagem-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+}
+
+.light-theme .bipagem-toggle-row {
+  border-bottom: 1px dashed rgba(15, 23, 42, 0.08);
+}
+
+/* Toggle Switch customizado */
+.switch-custom {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+}
+
+.switch-custom input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider-custom {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.15);
+  transition: .3s;
+  border-radius: 24px;
+}
+
+.light-theme .slider-custom {
+  background-color: rgba(15, 23, 42, 0.12);
+}
+
+.slider-custom:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.switch-custom input:checked + .slider-custom {
+  background-color: var(--color-secondary);
+}
+
+.switch-custom input:checked + .slider-custom:before {
+  transform: translateX(22px);
+}
+
+/* Ajustes responsivos da tabela do relatório */
+.report-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.report-table-container table {
+  width: 100%;
+  min-width: 680px; /* Garante espaço horizontal suficiente */
+  border-collapse: collapse;
+}
+
+/* Ajuste específico para impressão paisagem */
+@media print {
+  @page {
+    size: landscape !important;
+  }
+}

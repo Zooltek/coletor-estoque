@@ -1,9 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import ScannerView from './ScannerView';
-import ScannerToolbar from './ScannerToolbar';
-import ScannerOverlay from './ScannerOverlay';
-import ScannerBottomPanel from './ScannerBottomPanel';
-import ScannerStatus from './ScannerStatus';
+import ScannerLayout from './ScannerLayout';
 import { useScanner } from '../../hooks/useScanner';
 
 export default function ScannerContainer({
@@ -24,9 +20,9 @@ export default function ScannerContainer({
   setPalletOpen
 }) {
   const { pause, resume, stop } = useScanner();
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackProduct, setFeedbackProduct] = useState(null);
+  const [scanHistory, setScanHistory] = useState([]);
 
   useEffect(() => {
     if (isPaused) {
@@ -36,10 +32,13 @@ export default function ScannerContainer({
     }
   }, [isPaused, pause, resume]);
 
+  // Track history for bipagem mode
   useEffect(() => {
     if (scannedProduct && isBipagemMode) {
       setShowFeedback(true);
       setFeedbackProduct(scannedProduct);
+      setScanHistory(prev => [scannedProduct, ...prev].slice(0, 3));
+      
       const timer = setTimeout(() => {
         setShowFeedback(false);
       }, 300);
@@ -52,46 +51,29 @@ export default function ScannerContainer({
     onClose();
   };
 
+  const handleConfirmCount = () => {
+    if (scannedProduct && !isBipagemMode) {
+      setScanHistory(prev => [scannedProduct, ...prev].slice(0, 3));
+    }
+    confirmCount();
+  };
+
   return (
-    <div className={`camera-scanner-container professional-hud ${isFullscreen ? 'fullscreen-scanner' : ''}`}>
-      <div className="scanner-hud-header">
-        <div className="hud-header-left">
-          <small>Inventário</small>
-          <h5>{currentInventory ? currentInventory.name : "Nenhum"}</h5>
-        </div>
-        <div className="hud-header-right">
-          <small>Itens Contados</small>
-          <span className="hud-counter-val">{totalItemsCounted}</span>
-        </div>
-        <button className="btn-close-scanner-hud" onClick={handleClose}>&times;</button>
-      </div>
-
-      <div className="scanner-frame">
-        <ScannerView onScan={onScan} />
-        <ScannerOverlay showFeedback={showFeedback} />
-      </div>
-
-      <ScannerToolbar 
-        soundMuted={soundMuted}
-        onToggleMute={onToggleMute}
-        isFullscreen={isFullscreen}
-        onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
-      />
-
-      <ScannerBottomPanel 
-        isBipagemMode={isBipagemMode}
-        showFeedback={showFeedback}
-        feedbackProduct={feedbackProduct}
-        scannedProduct={scannedProduct}
-        scanQty={scanQty}
-        adjustQty={adjustQty}
-        setScanQty={setScanQty}
-        setPalletOpen={setPalletOpen}
-        confirmCount={confirmCount}
-        cancelCount={cancelCount}
-      />
-
-      <ScannerStatus />
-    </div>
+    <ScannerLayout
+      onScan={onScan}
+      onClose={handleClose}
+      soundMuted={soundMuted}
+      onToggleMute={onToggleMute}
+      currentInventory={currentInventory}
+      scannedProduct={scannedProduct}
+      totalItemsCounted={totalItemsCounted}
+      isBipagemMode={isBipagemMode}
+      scanQty={scanQty}
+      setScanQty={setScanQty}
+      confirmCount={handleConfirmCount}
+      cancelCount={cancelCount}
+      history={scanHistory}
+      showFeedback={showFeedback}
+    />
   );
 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import ScannerHeader from './ScannerHeader';
 import ScannerCameraArea from './ScannerCameraArea';
-import ScannerFooter from './ScannerFooter';
+import { ScannerFooter } from './footer';
 import ScannerInfoCard from './ScannerInfoCard';
 import ScannerStatusChip from './ScannerStatusChip';
 import { ScanFeedback } from './feedback';
@@ -63,6 +63,8 @@ export default function ScannerLayout({
         history={history}
         onConfirm={confirmCount}
         isBipagemMode={isBipagemMode}
+        totalItemsCounted={totalItemsCounted}
+        errorMessage={errorMessage}
       />
     </div>
   );

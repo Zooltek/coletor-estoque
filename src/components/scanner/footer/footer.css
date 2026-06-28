@@ -1,0 +1,178 @@
+.scanner-hud-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--surface);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  max-height: 35%;
+  height: auto;
+  min-height: 30%;
+  overflow-y: auto;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+  z-index: 100; /* above camera */
+}
+
+/* Sections */
+.hud-section {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+.hud-section:last-child {
+  margin-bottom: 0;
+}
+
+.hud-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hud-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+/* Last Read Card */
+.hud-barcode {
+  font-family: monospace;
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.hud-barcode.empty {
+  color: var(--text-secondary);
+  font-size: 16px;
+  font-weight: normal;
+  font-family: inherit;
+}
+
+/* Product Card */
+.hud-product-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud-product-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hud-product-error {
+  color: var(--error);
+}
+
+/* Quantity Control */
+.hud-qty-control {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.hud-qty-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-light, #2a2a2a);
+  color: var(--text-primary);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
+.hud-qty-btn:active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.hud-qty-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.hud-qty-value {
+  font-size: 24px;
+  font-weight: bold;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* Inventory Summary */
+.hud-summary-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+/* History Panel */
+.hud-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.hud-history-item {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: 6px 8px;
+  border-radius: 6px;
+  gap: 8px;
+  animation: slideIn 200ms ease-out forwards;
+}
+.hud-history-icon {
+  color: var(--success);
+  font-size: 14px;
+}
+.hud-history-details {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+.hud-history-code {
+  font-size: 12px;
+  font-family: monospace;
+  color: var(--text-secondary);
+}
+.hud-history-desc {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Divider */
+.hud-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 8px 0;
+  opacity: 0.5;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

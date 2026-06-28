@@ -1000,16 +1000,11 @@ export default function App() {
                             isPaused={isPaused}
                             soundMuted={soundMuted}
                             onToggleMute={() => setSoundMuted(!soundMuted)}
-                            currentInventory={currentInventory}
-                            scannedProduct={scannedProduct}
-                            totalItemsCounted={totalItemsCounted}
                             isBipagemMode={isBipagemMode}
                             scanQty={scanQty}
-                            adjustQty={adjustQty}
                             setScanQty={setScanQty}
                             confirmCount={confirmCount}
                             cancelCount={cancelCount}
-                            setPalletOpen={setPalletOpen}
                           />
                         ) : (
                           <div className="card-custom glassmorphism" style={{ margin: '16px', textAlign: 'center', padding: '30px' }}>

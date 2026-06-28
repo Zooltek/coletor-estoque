@@ -11,16 +11,11 @@ export default function ScannerContainer({
   isPaused,
   soundMuted,
   onToggleMute,
-  currentInventory,
-  scannedProduct,
-  totalItemsCounted,
   isBipagemMode,
   scanQty,
-  adjustQty,
   setScanQty,
   confirmCount,
-  cancelCount,
-  setPalletOpen
+  cancelCount
 }) {
   const { pause, resume, stop } = useScanner();
   const { pipelineState, processScan, pausePipeline, resumePipeline } = useScannerPipeline(onScan);
@@ -59,15 +54,11 @@ export default function ScannerContainer({
       onClose={handleClose}
       soundMuted={soundMuted}
       onToggleMute={onToggleMute}
-      currentInventory={currentInventory}
-      scannedProduct={scannedProduct}
-      totalItemsCounted={totalItemsCounted}
       isBipagemMode={isBipagemMode}
       scanQty={scanQty}
       setScanQty={setScanQty}
       confirmCount={handleConfirmCount}
       cancelCount={cancelCount}
-      history={scanHistory}
       pipelineState={pipelineState}
     />
   );

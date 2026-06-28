@@ -5,21 +5,23 @@ import QuantityControl from './QuantityControl';
 import InventorySummary from './InventorySummary';
 import { HistoryPanel } from '../history';
 import FooterDivider from './FooterDivider';
+import { useScannerSession } from '../../../hooks/useScannerSession';
 import './footer.css';
 
 const ScannerFooter = React.memo(({ 
-  scannedProduct, 
   isBipagemMode, 
   scanQty, 
   setScanQty, 
-  onConfirm, 
-  totalItemsCounted,
-  pipelineState,
-  errorMessage
+  onConfirm 
 }) => {
+  const session = useScannerSession();
+  const scannedProduct = session?.state?.lastProduct;
+  const errorMessage = session?.state?.lastError;
+  const totalItemsCounted = session?.metrics?.acceptedReads || 0;
+
   return (
     <div className="scanner-hud-footer">
-      <LastReadCard barcode={scannedProduct?.barcode} />
+      <LastReadCard barcode={session?.state?.lastBarcode} />
       <FooterDivider />
       
       <ProductCard product={scannedProduct} error={errorMessage} />

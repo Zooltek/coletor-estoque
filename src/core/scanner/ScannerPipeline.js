@@ -14,12 +14,19 @@ import BusinessValidator from './pipeline/validators/BusinessValidator';
 
 import HistoryService from '../../services/history/HistoryService';
 import FeedbackService from '../../services/feedback/FeedbackService';
+import { ScannerSessionManager } from './session';
 
 export const ScannerPipelineEvents = ScannerEvent;
 
 export default class ScannerPipeline {
   constructor(onEvent) {
     this.onEvent = onEvent;
+    
+    // Assegura que uma sessão existe
+    if (!ScannerSessionManager.getSnapshot()) {
+      ScannerSessionManager.createSession();
+    }
+
     
     this.fsm = new ScannerStateMachine(ScannerState.INITIALIZING);
     this.fsm.subscribe((event, state, payload) => {
@@ -96,6 +103,9 @@ export default class ScannerPipeline {
     const desc = product ? product.description : '';
     const pid = product ? product.id : null;
     const errorMsg = validation.errors.length > 0 ? validation.errors[0].message || validation.errors[0] : '';
+
+    // Atualiza o contexto de sessão central
+    ScannerSessionManager.updateFromPipelineContext(context);
 
     if (result === PipelineResult.SUCCESS) {
       this.transition(ScannerState.PROCESSING, { barcode }, 'Processing success');

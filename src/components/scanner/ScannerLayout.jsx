@@ -5,6 +5,7 @@ import { ScannerFooter } from './footer';
 import ScannerInfoCard from './ScannerInfoCard';
 import ScannerStatusChip from './ScannerStatusChip';
 import { ScanFeedback } from './feedback';
+import { useScannerSession } from '../../hooks/useScannerSession';
 import './scanner-professional.css';
 
 export default function ScannerLayout({
@@ -13,18 +14,18 @@ export default function ScannerLayout({
   soundMuted,
   onToggleMute,
   currentInventory,
-  scannedProduct,
-  totalItemsCounted,
   isBipagemMode,
   scanQty,
   setScanQty,
   confirmCount,
   cancelCount,
-  history = [],
-  showFeedback,
-  pipelineState,
-  errorMessage
+  pipelineState
 }) {
+  const session = useScannerSession();
+  const scannedProduct = session?.state?.lastProduct;
+  const errorMessage = session?.state?.lastError;
+  const totalItemsCounted = session?.metrics?.acceptedReads || 0;
+
   return (
     <div className="scanner-professional-layout">
       <ScannerToolbar 
@@ -56,13 +57,10 @@ export default function ScannerLayout({
       />
 
       <ScannerFooter 
-        scannedProduct={scannedProduct}
         scanQty={scanQty}
         setScanQty={setScanQty}
         onConfirm={confirmCount}
         isBipagemMode={isBipagemMode}
-        totalItemsCounted={totalItemsCounted}
-        errorMessage={errorMessage}
       />
     </div>
   );

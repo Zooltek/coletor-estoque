@@ -2315,3 +2315,19 @@ input:focus, select:focus {
     size: landscape !important;
   }
 }
+
+/* Transparência para exibição da câmera nativa por baixo do WebView */
+body.barcode-scanner-active,
+body.barcode-scanner-active #root,
+body.barcode-scanner-active .device-frame-container,
+body.barcode-scanner-active .device-screen,
+body.barcode-scanner-active .collect-screen-wrapper,
+body.barcode-scanner-active .collect-inputs-area,
+body.barcode-scanner-active .camera-scanner-container {
+  background: transparent !important;
+}
+
+body.barcode-scanner-active .scanner-frame {
+  background: transparent !important;
+  border-color: rgba(242, 101, 34, 0.4);
+}

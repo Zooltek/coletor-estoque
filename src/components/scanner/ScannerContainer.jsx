@@ -33,8 +33,7 @@ export default function ScannerContainer({
   // Registra o hook de feedback visual e sonoro associado ao pipeline
   useFeedback(pipelineState);
   
-  const [scanHistory, setScanHistory] = useState([]);
-
+  // Removed scanHistory
   useEffect(() => {
     if (isPaused) {
       pause();
@@ -45,22 +44,12 @@ export default function ScannerContainer({
     }
   }, [isPaused, pause, resume, pausePipeline, resumePipeline]);
 
-  // Track history for bipagem mode
-  useEffect(() => {
-    if (scannedProduct && isBipagemMode) {
-      setScanHistory(prev => [scannedProduct, ...prev].slice(0, 3));
-    }
-  }, [scannedProduct, isBipagemMode]);
-
   const handleClose = async () => {
     await stop();
     onClose();
   };
 
   const handleConfirmCount = () => {
-    if (scannedProduct && !isBipagemMode) {
-      setScanHistory(prev => [scannedProduct, ...prev].slice(0, 3));
-    }
     confirmCount();
   };
 

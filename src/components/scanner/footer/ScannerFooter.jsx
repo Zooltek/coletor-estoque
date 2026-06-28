@@ -3,19 +3,19 @@ import LastReadCard from './LastReadCard';
 import ProductCard from './ProductCard';
 import QuantityControl from './QuantityControl';
 import InventorySummary from './InventorySummary';
-import HistoryPanel from './HistoryPanel';
+import { HistoryPanel } from '../history';
 import FooterDivider from './FooterDivider';
 import './footer.css';
 
-const ScannerFooter = React.memo(({
-  scannedProduct,
-  scanQty,
-  setScanQty,
-  history = [],
+const ScannerFooter = React.memo(({ 
+  scannedProduct, 
+  isBipagemMode, 
+  scanQty, 
+  setScanQty, 
+  onConfirm, 
   totalItemsCounted,
-  errorMessage,
-  isBipagemMode,
-  onConfirm
+  pipelineState,
+  errorMessage
 }) => {
   return (
     <div className="scanner-hud-footer">
@@ -39,12 +39,8 @@ const ScannerFooter = React.memo(({
       
       <InventorySummary totalItems={totalItemsCounted} />
       
-      {history.length > 0 && (
-        <>
-          <FooterDivider />
-          <HistoryPanel history={history} />
-        </>
-      )}
+      <FooterDivider />
+      <HistoryPanel />
     </div>
   );
 });

@@ -59,7 +59,6 @@ export default function ScannerLayout({
         scannedProduct={scannedProduct}
         scanQty={scanQty}
         setScanQty={setScanQty}
-        history={history}
         onConfirm={confirmCount}
         isBipagemMode={isBipagemMode}
         totalItemsCounted={totalItemsCounted}

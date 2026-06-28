@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ScannerPipeline from '../core/scanner/ScannerPipeline';
-import { ScannerState } from '../core/scanner/state';
+import { ScannerState, ScannerEvent } from '../core/scanner/state';
+import HistoryService from '../services/history/HistoryService';
 
 export function useScannerPipeline(onValidateScan) {
   const [pipelineState, setPipelineState] = useState(ScannerState.INITIALIZING);
@@ -14,9 +15,16 @@ export function useScannerPipeline(onValidateScan) {
 
   useEffect(() => {
     const pipeline = new ScannerPipeline((newState, payload) => {
-      // O pipeline agora envia os eventos de STATE_CHANGED via FSM
-      // Tratamentos para payloads podem ser adicionados aqui se necessário
       setPipelineState(newState);
+      
+      // Notify History Service based on events
+      if (newState === ScannerState.SUCCESS) {
+        HistoryService.add(payload?.barcode || 'unknown', 'SUCCESS', null, '', 1);
+      } else if (newState === ScannerState.ERROR) {
+        HistoryService.add(payload?.barcode || 'error', 'ERROR', null, payload?.error?.message || 'Error', 1);
+      } else if (newState === ScannerEvent.DUPLICATED) {
+        HistoryService.add(payload || 'duplicated', 'DUPLICATE', null, 'Leitura Duplicada', 1);
+      }
     });
     
     pipelineRef.current = pipeline;

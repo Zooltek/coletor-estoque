@@ -6,7 +6,7 @@
     RFC-0005-painel-inferior.md x
     RFC-0006-toolbar.md x
     RFC-0007-maquina-estados.md x
-    RFC-0008-historico.md x
+    RFC-0008-historico.md
     RFC-0009-pipeline-scanner.md
     RFC-0010-performance-react.md
     RFC-0011-performance-android.md

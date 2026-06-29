@@ -1,7 +1,8 @@
 {
-  "name": "coletor-estoque",
+  "name": "amura-collector",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Amura Collector - Sistema Profissional de Coleta de Dados",
   "type": "module",
   "scripts": {
     "dev": "vite",

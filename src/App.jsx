@@ -26,6 +26,11 @@ import PalletModal from './components/PalletModal';
 import FileMerger from './components/FileMerger';
 import KardexDashboard from './components/KardexDashboard';
 import FeedbackService from './services/feedback/FeedbackService';
+import { useConfiguration } from './hooks/useConfiguration';
+import { usePerformanceMetrics } from './hooks/usePerformanceMetrics';
+import SettingsPage from './components/settings/SettingsPage';
+import DiagnosticsPage from './components/diagnostics/DiagnosticsPage';
+import { SyncIndicator } from './components/sync/SyncIndicator';
 import './App.css';
 
 export default function App() {
@@ -35,11 +40,15 @@ export default function App() {
     setStoresList(getStores());
   }, []);
 
-  // CONFIGURAÇÃO DE TEMA
-  const [theme, setTheme] = useState(localStorage.getItem('sc_theme') || 'dark');
+  // CONFIGURAÇÃO DE TEMA E APP
+  const { config } = useConfiguration();
+  const theme = config ? config.interface.theme : 'dark';
+  const enableDiagnostics = config?.developer?.enableDiagnostics || false;
+
+  // Inicializa o monitoramento de performance em background
+  usePerformanceMetrics();
 
   useEffect(() => {
-    localStorage.setItem('sc_theme', theme);
     if (theme === 'light') {
       document.body.classList.add('light-theme');
     } else {
@@ -70,32 +79,16 @@ export default function App() {
   const [scannedProduct, setScannedProduct] = useState(null);
   const [scanQty, setScanQty] = useState(1);
   const [activeSector, setActiveSector] = useState('Setor 01');
-  const [isRecountMode, setIsRecountMode] = useState(false);
   
-  // Modos de contagem e estados adicionais do leitor
-  const [countMethod, setCountMethod] = useState(localStorage.getItem('sc_count_method') || 'scan'); // 'scan' | 'type'
-  const [isBipagemMode, setIsBipagemMode] = useState(localStorage.getItem('sc_bipagem_mode') !== 'false'); // default true
+  // Extrai as configurações diretamente do Singleton reativo
+  const isRecountMode = false; // A ser implementado futuramente na UI se precisar
+  const countMethod = config ? config.scanner.method : 'scan';
+  const isBipagemMode = config ? config.scanner.continuousMode : true;
+  const soundMuted = config ? config.feedback.soundMuted : false;
+  const isBlindCount = config ? config.scanner.blindCount : false;
+
   const [isPaused, setIsPaused] = useState(false);
-  const [soundMuted, setSoundMuted] = useState(localStorage.getItem('sc_sound_muted') === 'true');
-  const [isBlindCount, setIsBlindCount] = useState(localStorage.getItem('sc_blind_count') === 'true');
-
-  useEffect(() => {
-    localStorage.setItem('sc_blind_count', isBlindCount);
-  }, [isBlindCount]);
-
-  useEffect(() => {
-    localStorage.setItem('sc_count_method', countMethod);
-  }, [countMethod]);
-
-  useEffect(() => {
-    localStorage.setItem('sc_bipagem_mode', isBipagemMode);
-  }, [isBipagemMode]);
-
-  useEffect(() => {
-    localStorage.setItem('sc_sound_muted', soundMuted);
-  }, [soundMuted]);
-
-  const [cameraOpen, setCameraOpen] = useState(localStorage.getItem('sc_count_method') !== 'type');
+  const [cameraOpen, setCameraOpen] = useState(countMethod !== 'type');
   const [palletOpen, setPalletOpen] = useState(false);
 
   // PESQUISA E CONSULTA (MANUTENÇÃO)
@@ -773,7 +766,8 @@ export default function App() {
             <div className="app-top-header">
               <div className="logo-header-area">
                 <img src="/logo.ico" alt="Amura Logo" className="logo-header-img" />
-                <span className="logo-header-title">Amura Collector</span>
+                <span className="logo-header-title" style={{ marginRight: '8px' }}>Amura Collector</span>
+                <SyncIndicator />
               </div>
               <div className="header-actions">
                 <button 
@@ -1445,12 +1439,19 @@ export default function App() {
               )
             )}
 
+            {/* TELA 7: DIAGNOSTICOS */}
+            {activeTab === 'diagnostics' && enableDiagnostics && (
+              <DiagnosticsPage />
+            )}
+
             {/* TELA 6: CONFIGURAÇÕES */}
             {activeTab === 'settings' && (
               <div className="settings-screen animate-fade">
                 
+                <SettingsPage />
+
                 {/* IMPORTAR NOVO CATÁLOGO DE PRODUTOS */}
-                <div className="card-custom glassmorphism">
+                <div className="card-custom glassmorphism" style={{ marginTop: '20px' }}>
                   <div className="card-header-custom">
                     <h4>📥 Importar Catálogo de Produtos (ERP)</h4>
                     <p className="card-subtitle">Carregue a planilha de produtos do seu ERP. Formato aceito: CSV/TXT (codigo;descricao;marca;categoria;preco;estoque).</p>
@@ -1564,6 +1565,16 @@ export default function App() {
               <span className="nav-icon">⚙️</span>
               <span>Ajustes</span>
             </button>
+
+            {enableDiagnostics && (
+              <button 
+                className={`nav-item ${activeTab === 'diagnostics' ? 'active' : ''}`}
+                onClick={() => { setActiveTab('diagnostics'); setMergedCounts(null); }}
+              >
+                <span className="nav-icon">🛠️</span>
+                <span>Diag</span>
+              </button>
+            )}
           </div>
 
           {/* PALLET CALCULATOR MODAL */}

@@ -8,12 +8,12 @@
     RFC-0007-maquina-estados.md x
     RFC-0008-historico.md x
     RFC-0009-pipeline-scanner.md x
-    RFC-0010-performance-react.md
-    RFC-0011-performance-android.md
-    RFC-0012-mlkit.md
-    RFC-0013-zoom-inteligente.md
-    RFC-0014-torch-inteligente.md
-    RFC-0015-configuracoes.md
-    RFC-0016-dashboard.md
-    RFC-0017-sincronizacao.md
-    RFC-0018-polimento-final.md
+    RFC-0010-performance-react.md x
+    RFC-0011-performance-android.md x
+    RFC-0012-mlkit.md x
+    RFC-0013-zoom-inteligente.md x
+    RFC-0014-torch-inteligente.md x
+    RFC-0015-configuracoes.md x
+    RFC-0016-dashboard.md x
+    RFC-0017-sincronizacao.md x
+    RFC-0018-polimento-final.md x

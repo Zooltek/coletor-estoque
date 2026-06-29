@@ -1,9 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { useScanner } from '../../hooks/useScanner';
-import { ScannerState } from '../../core/scanner/types';
 
-export default function ScannerView({ onScan }) {
-  const { start, state } = useScanner();
+const ScannerView = React.memo(({ onScan }) => {
+  const { start } = useScanner();
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -15,12 +14,10 @@ export default function ScannerView({ onScan }) {
     }
   }, [start, onScan]);
 
-  const isScanning = state === ScannerState.SCANNING;
-
+  // A renderização é única. O DOM interno (video) é gerido pela lib fora do ciclo React.
   return (
-    <>
-      <div id="camera-reader-element"></div>
-      {isScanning && <div className="scanner-laser-line"></div>}
-    </>
+    <div id="camera-reader-element"></div>
   );
-}
+});
+
+export default ScannerView;

@@ -1,7 +1,19 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScannerState } from '../../../core/scanner/state';
 
-const ScannerStatusIndicator = React.memo(({ pipelineState }) => {
+const ScannerStatusIndicator = React.memo(({ subscribePipeline, pipelineRef }) => {
+  const [pipelineState, setPipelineState] = useState(() => 
+    pipelineRef?.current ? pipelineRef.current.state : ScannerState.INITIALIZING
+  );
+
+  useEffect(() => {
+    if (subscribePipeline) {
+      return subscribePipeline((newState) => {
+        setPipelineState(newState);
+      });
+    }
+  }, [subscribePipeline]);
+
   let statusClass = 'status-ready'; // fallback/ready
   
   switch (pipelineState) {

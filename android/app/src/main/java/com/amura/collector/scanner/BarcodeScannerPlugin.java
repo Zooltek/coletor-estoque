@@ -10,6 +10,8 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import com.amura.collector.performance.CameraPerformanceManager;
+
 @CapacitorPlugin(
     name = "BarcodeScannerPlugin",
     permissions = {
@@ -21,29 +23,24 @@ import com.getcapacitor.annotation.PermissionCallback;
 )
 public class BarcodeScannerPlugin extends Plugin {
     private CameraController cameraController;
-    private BarcodeProcessor barcodeProcessor;
     private BarcodeAnalyzer barcodeAnalyzer;
     private TorchController torchController;
-    private ZoomController zoomController;
+    private SmartZoomController zoomController;
+    private SmartLightController lightController;
+    private CameraPerformanceManager performanceManager;
 
     @Override
     public void load() {
         super.load();
         cameraController = new CameraController(getActivity(), getBridge());
         torchController = new TorchController(getContext());
-        zoomController = new ZoomController();
-        
-        barcodeProcessor = new BarcodeProcessor(new BarcodeProcessor.OnBarcodeValidatedListener() {
-            @Override
-            public void onBarcodeValidated(String barcode) {
-                zoomController.resetZoomAfterScan();
-                triggerFeedback();
-                
-                JSObject ret = new JSObject();
-                ret.put("barcode", barcode);
-                notifyListeners("barcodeDetected", ret);
-            }
+        zoomController = new SmartZoomController();
+        lightController = new SmartLightController(torchController, isOn -> {
+            JSObject ret = new JSObject();
+            ret.put("torchActive", isOn);
+            notifyListeners("torchChanged", ret);
         });
+        performanceManager = new CameraPerformanceManager(getContext());
     }
 
     @PluginMethod
@@ -53,15 +50,22 @@ public class BarcodeScannerPlugin extends Plugin {
             return;
         }
 
-        barcodeProcessor.clearThrottle();
-        barcodeAnalyzer = new BarcodeAnalyzer(barcodeProcessor, zoomController);
+        barcodeAnalyzer = new BarcodeAnalyzer(new BarcodeAnalyzer.OnBarcodeDetectedListener() {
+            @Override
+            public void onBarcodeDetected(JSObject barcodeResult) {
+                zoomController.resetZoomAfterScan();
+                triggerFeedback();
+                
+                // Emite o JSObject já formatado com todos os dados do Scanner Inteligente
+                notifyListeners("barcodeDetected", barcodeResult);
+            }
+        }, zoomController, lightController);
 
         cameraController.start(barcodeAnalyzer, new CameraController.OnCameraReadyListener() {
             @Override
             public void onCameraReady() {
                 torchController.setCamera(cameraController.getCamera());
                 zoomController.setCamera(cameraController.getCamera());
-                torchController.startAutoTorch();
 
                 notifyListeners("cameraReady", new JSObject());
                 call.resolve();
@@ -88,7 +92,6 @@ public class BarcodeScannerPlugin extends Plugin {
 
     @PluginMethod
     public void stop(PluginCall call) {
-        torchController.stopAutoTorch();
         cameraController.stop();
         barcodeAnalyzer = null;
         call.resolve();
@@ -114,10 +117,7 @@ public class BarcodeScannerPlugin extends Plugin {
     public void toggleTorch(PluginCall call) {
         Boolean on = call.getBoolean("on");
         if (on != null) {
-            torchController.toggleTorch(on);
-            JSObject ret = new JSObject();
-            ret.put("torchActive", on);
-            notifyListeners("torchChanged", ret);
+            lightController.setManualOverride(on);
             call.resolve();
         } else {
             call.reject("Parametro 'on' ausente");
@@ -128,13 +128,61 @@ public class BarcodeScannerPlugin extends Plugin {
     public void setZoom(PluginCall call) {
         Float level = call.getFloat("level");
         if (level != null) {
-            zoomController.setZoom(level);
+            zoomController.setZoom(level, true); // true = isManual
             JSObject ret = new JSObject();
             ret.put("zoomLevel", level);
             notifyListeners("zoomChanged", ret);
             call.resolve();
         } else {
             call.reject("Parametro 'level' ausente");
+        }
+    }
+
+    @PluginMethod
+    public void getCameraMetrics(PluginCall call) {
+        if (zoomController != null) {
+            CameraMetrics metrics = zoomController.getMetrics();
+            call.resolve(metrics.getSnapshot());
+        } else {
+            call.reject("Zoom Controller inativo");
+        }
+    }
+
+    @PluginMethod
+    public void getPerformance(PluginCall call) {
+        if (performanceManager != null) {
+            double fps = barcodeAnalyzer != null ? barcodeAnalyzer.getCurrentFps() : 0.0;
+            long avgProcTime = barcodeAnalyzer != null ? barcodeAnalyzer.getAverageProcessingTimeMs() : 0;
+            call.resolve(performanceManager.getFullPerformanceSnapshot(fps, avgProcTime));
+        } else {
+            call.reject("Manager não inicializado");
+        }
+    }
+
+    @PluginMethod
+    public void getMemory(PluginCall call) {
+        if (performanceManager != null) {
+            call.resolve(performanceManager.getMemoryMonitor().getMemorySnapshot());
+        } else {
+            call.reject("Manager não inicializado");
+        }
+    }
+
+    @PluginMethod
+    public void getBattery(PluginCall call) {
+        if (performanceManager != null) {
+            call.resolve(performanceManager.getBatteryMonitor().getBatterySnapshot());
+        } else {
+            call.reject("Manager não inicializado");
+        }
+    }
+
+    @PluginMethod
+    public void getThermal(PluginCall call) {
+        if (performanceManager != null) {
+            call.resolve(performanceManager.getThermalMonitor().getThermalSnapshot());
+        } else {
+            call.reject("Manager não inicializado");
         }
     }
 

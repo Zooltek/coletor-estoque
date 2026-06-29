@@ -4,6 +4,7 @@ import { useScanner } from '../../hooks/useScanner';
 import { useScannerPipeline } from '../../hooks/useScannerPipeline';
 import { useFeedback } from '../../hooks/useFeedback';
 import FeedbackService from '../../services/feedback/FeedbackService';
+import { useRenderTracker } from '../../hooks/performance/useRenderTracker';
 
 export default function ScannerContainer({
   onScan, // Now acts as validator
@@ -17,8 +18,10 @@ export default function ScannerContainer({
   confirmCount,
   cancelCount
 }) {
+  useRenderTracker('ScannerContainer');
+
   const { pause, resume, stop } = useScanner();
-  const { pipelineState, processScan, pausePipeline, resumePipeline } = useScannerPipeline(onScan);
+  const { pipelineRef, subscribe, processScan, pausePipeline, resumePipeline } = useScannerPipeline(onScan);
   
   // Habilita/Desabilita sons do serviço com base na prop soundMuted
   useEffect(() => {
@@ -26,9 +29,8 @@ export default function ScannerContainer({
   }, [soundMuted]);
 
   // Registra o hook de feedback visual e sonoro associado ao pipeline
-  useFeedback(pipelineState);
+  useFeedback();
   
-  // Removed scanHistory
   useEffect(() => {
     if (isPaused) {
       pause();
@@ -50,7 +52,7 @@ export default function ScannerContainer({
 
   return (
     <ScannerLayout
-      onScan={processScan} // Passing pipeline processing function instead of raw App processBarcode
+      onScan={processScan}
       onClose={handleClose}
       soundMuted={soundMuted}
       onToggleMute={onToggleMute}
@@ -59,7 +61,8 @@ export default function ScannerContainer({
       setScanQty={setScanQty}
       confirmCount={handleConfirmCount}
       cancelCount={cancelCount}
-      pipelineState={pipelineState}
+      pipelineRef={pipelineRef}
+      subscribePipeline={subscribe}
     />
   );
 }

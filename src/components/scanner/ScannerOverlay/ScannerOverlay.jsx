@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import OverlayMask from './OverlayMask';
 import OverlayFrame from './OverlayFrame';
 import OverlayCorners from './OverlayCorners';
@@ -8,11 +8,25 @@ import { useScanner } from '../../../hooks/useScanner';
 import { ScannerState } from '../../../core/scanner/state';
 import './scanner-overlay.css';
 
-export default function ScannerOverlay({ pipelineState }) {
+const ScannerOverlay = React.memo(({ pipelineRef, subscribePipeline }) => {
   const { state: contextState } = useScanner();
   
-  // Use pipelineState if provided, otherwise fallback to contextState
-  const visualState = pipelineState && pipelineState !== ScannerState.INITIALIZING ? pipelineState : contextState;
+  const [pipelineState, setPipelineState] = useState(() => 
+    pipelineRef?.current ? pipelineRef.current.state : null
+  );
+
+  useEffect(() => {
+    if (subscribePipeline) {
+      return subscribePipeline((newState) => {
+        setPipelineState(newState);
+      });
+    }
+  }, [subscribePipeline]);
+
+  // Use pipelineState if available and not INITIALIZING, otherwise fallback to contextState
+  const visualState = (pipelineState && pipelineState !== ScannerState.INITIALIZING) 
+    ? pipelineState 
+    : contextState;
 
   return (
     <div className="so-container">
@@ -26,4 +40,6 @@ export default function ScannerOverlay({ pipelineState }) {
       </div>
     </div>
   );
-}
+});
+
+export default ScannerOverlay;

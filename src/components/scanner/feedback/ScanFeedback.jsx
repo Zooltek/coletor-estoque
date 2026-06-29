@@ -4,7 +4,19 @@ import SuccessBanner from './SuccessBanner';
 import ErrorBanner from './ErrorBanner';
 import { ScannerState, ScannerEvent } from '../../../core/scanner/state';
 
-const ScanFeedback = React.memo(({ pipelineState, scannedProduct, errorMessage }) => {
+const ScanFeedback = React.memo(({ pipelineRef, subscribePipeline, scannedProduct, errorMessage }) => {
+  const [pipelineState, setPipelineState] = useState(() => 
+    pipelineRef?.current ? pipelineRef.current.state : null
+  );
+
+  useEffect(() => {
+    if (subscribePipeline) {
+      return subscribePipeline((newState) => {
+        setPipelineState(newState);
+      });
+    }
+  }, [subscribePipeline]);
+
   const [showSuccess, setShowSuccess] = useState(false);
   const [showError, setShowError] = useState(false);
   const [showDuplicate, setShowDuplicate] = useState(false);
@@ -20,7 +32,7 @@ const ScanFeedback = React.memo(({ pipelineState, scannedProduct, errorMessage }
         setShowError(true);
         setOverlayClass('feedback-overlay-error');
         break;
-      case ScannerEvent.DUPLICATED:
+      case ScannerEvent.DUPLICATED: // Note: ScannerEvent.DUPLICATED isn't a state strictly, mas se for emitido como state no pipeline
         setShowDuplicate(true);
         setOverlayClass('feedback-overlay-duplicate');
         break;

@@ -1,8 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useContext } from 'react';
 import ToolbarService from '../services/toolbar/ToolbarService';
-import { useScanner } from './useScanner';
+import { ToolbarContext } from '../contexts/ToolbarContext';
 
 export function useToolbar({ onClose, pipelineState }) {
+  const context = useContext(ToolbarContext);
+  if (!context) throw new Error('useToolbar must be within ToolbarProvider');
+
   // Extrai funções e capacidades brutas do serviço de scanner
   const { 
     zoomLevel, 
@@ -10,7 +13,7 @@ export function useToolbar({ onClose, pipelineState }) {
     torchActive, 
     toggleTorch, 
     capabilities 
-  } = useScanner();
+  } = context;
 
   const torchAvailable = capabilities?.torch ?? false;
   const zoomAvailable = capabilities?.zoom ?? false;

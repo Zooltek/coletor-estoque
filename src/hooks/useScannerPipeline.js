@@ -1,12 +1,23 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import ScannerPipeline from '../core/scanner/ScannerPipeline';
-import { ScannerState, ScannerEvent } from '../core/scanner/state';
+import { ScannerState } from '../core/scanner/state';
+import { useStableCallback } from './performance/useStableCallback';
 
 export function useScannerPipeline(onValidateScan) {
-  const [pipelineState, setPipelineState] = useState(ScannerState.INITIALIZING);
   const pipelineRef = useRef(null);
+  
+  // Guardamos callbacks para os componentes escutarem os eventos se precisarem (ex: Overlay)
+  const listeners = useRef(new Set());
 
-  // Keep a fresh reference to the validation callback
+  const subscribe = useStableCallback((callback) => {
+    listeners.current.add(callback);
+    // Dispara estado atual imediatamente ao assinar
+    if (pipelineRef.current) {
+      callback(pipelineRef.current.state, null);
+    }
+    return () => listeners.current.delete(callback);
+  });
+
   const validateRef = useRef(onValidateScan);
   useEffect(() => {
     validateRef.current = onValidateScan;
@@ -14,8 +25,8 @@ export function useScannerPipeline(onValidateScan) {
 
   useEffect(() => {
     const pipeline = new ScannerPipeline((newState, payload) => {
-      setPipelineState(newState);
-      // Feedback e History agora são controlados autonomamente pelas camadas e eventos 
+      // Repassa eventos para quem assinou (ex: componentes locais)
+      listeners.current.forEach(listener => listener(newState, payload));
     });
     
     pipelineRef.current = pipeline;
@@ -32,26 +43,29 @@ export function useScannerPipeline(onValidateScan) {
     };
   }, []);
 
-  const processScan = useCallback(async (code) => {
+  const processScan = useStableCallback(async (code) => {
     if (pipelineRef.current) {
       await pipelineRef.current.processRead(code, validateRef.current);
     }
-  }, []);
+  });
 
-  const pausePipeline = useCallback(() => {
+  const pausePipeline = useStableCallback(() => {
     if (pipelineRef.current) {
       pipelineRef.current.pause();
     }
-  }, []);
+  });
 
-  const resumePipeline = useCallback(() => {
+  const resumePipeline = useStableCallback(() => {
     if (pipelineRef.current) {
       pipelineRef.current.resume();
     }
-  }, []);
+  });
 
+  // Retornamos pipelineRef para acessar get state() sem forçar renders,
+  // e subscribe para componentes menores ouvirem mudanças
   return {
-    pipelineState,
+    pipelineRef,
+    subscribe,
     processScan,
     pausePipeline,
     resumePipeline

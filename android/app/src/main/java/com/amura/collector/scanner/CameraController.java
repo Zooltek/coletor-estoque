@@ -85,7 +85,7 @@ public class CameraController {
         ImageAnalysis.Builder analysisBuilder = new ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST);
         
-        analysisBuilder.setTargetResolution(new Size(1920, 1080));
+        analysisBuilder.setTargetResolution(new Size(1280, 720));
 
         ImageAnalysis imageAnalysis = analysisBuilder.build();
         imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(activity), analyzer);

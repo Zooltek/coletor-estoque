@@ -8,7 +8,7 @@ import CloseButton from './CloseButton';
 import ToolbarDivider from './ToolbarDivider';
 import './toolbar.css';
 
-const ScannerToolbar = React.memo(({ title, onClose, pipelineState }) => {
+const ScannerToolbar = React.memo(({ title, onClose, pipelineRef, subscribePipeline }) => {
   const {
     torchAvailable,
     torchActive,
@@ -18,7 +18,7 @@ const ScannerToolbar = React.memo(({ title, onClose, pipelineState }) => {
     handleZoomOut,
     handleSettings,
     handleClose
-  } = useToolbar({ onClose, pipelineState });
+  } = useToolbar({ onClose });
 
   return (
     <div className="scanner-hud-toolbar">
@@ -27,7 +27,7 @@ const ScannerToolbar = React.memo(({ title, onClose, pipelineState }) => {
       </div>
       
       <div className="toolbar-center">
-        <ScannerStatusIndicator pipelineState={pipelineState} />
+        <ScannerStatusIndicator pipelineRef={pipelineRef} subscribePipeline={subscribePipeline} />
       </div>
 
       <div className="toolbar-right">

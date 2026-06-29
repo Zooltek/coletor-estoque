@@ -1,7 +1,8 @@
 import IScanner from './IScanner';
 import { BarcodeScannerPlugin } from './definitions';
+import ScannerCapabilities from './ScannerCapabilities';
 
-export default class NativeScannerService extends IScanner {
+export default class NativeScannerAdapter extends IScanner {
   constructor() {
     super();
     this.isScanning = false;
@@ -12,26 +13,25 @@ export default class NativeScannerService extends IScanner {
     // No-op for native
   }
 
-
   async start(elementId, onScan) {
     if (this.isScanning) return;
 
     try {
-      // Torna a interface web transparente para expor a visualização nativa por trás
       document.body.classList.add('barcode-scanner-active');
 
-      // Adiciona o listener para detecções
       this.listener = await BarcodeScannerPlugin.addListener('barcodeDetected', (result) => {
-        if (result && result.barcode) {
-          onScan(result.barcode);
+        // O plugin agora envia o BarcodeResult completo com rawValue, format, boundingBox, etc.
+        // O ScannerPipeline cuida do debounce.
+        if (result && result.rawValue) {
+          // Mantendo a compatibilidade do onScan enviando o valor final pro pipeline
+          onScan(result.rawValue);
         }
       });
 
-      // Inicia a visualização nativa
       await BarcodeScannerPlugin.start();
       this.isScanning = true;
     } catch (err) {
-      console.error("Erro ao iniciar NativeScannerPlugin:", err);
+      console.error("Erro ao iniciar NativeScannerAdapter:", err);
       document.body.classList.remove('barcode-scanner-active');
       throw err;
     }
@@ -47,7 +47,7 @@ export default class NativeScannerService extends IScanner {
       }
       await BarcodeScannerPlugin.stop();
     } catch (err) {
-      console.error("Erro ao parar NativeScannerPlugin:", err);
+      console.error("Erro ao parar NativeScannerAdapter:", err);
     } finally {
       document.body.classList.remove('barcode-scanner-active');
       this.isScanning = false;
@@ -58,7 +58,7 @@ export default class NativeScannerService extends IScanner {
     try {
       await BarcodeScannerPlugin.pause();
     } catch (err) {
-      console.error("Erro ao pausar NativeScannerPlugin:", err);
+      console.error("Erro ao pausar NativeScannerAdapter:", err);
     }
   }
 
@@ -66,7 +66,7 @@ export default class NativeScannerService extends IScanner {
     try {
       await BarcodeScannerPlugin.resume();
     } catch (err) {
-      console.error("Erro ao retomar NativeScannerPlugin:", err);
+      console.error("Erro ao retomar NativeScannerAdapter:", err);
     }
   }
 
@@ -90,20 +90,15 @@ export default class NativeScannerService extends IScanner {
     await this.stop();
   }
 
-  async isTorchAvailable() {
-    const caps = this.getCapabilities();
-    return !!caps?.torch;
-  }
-
-  async isZoomAvailable() {
-    const caps = this.getCapabilities();
-    return !!caps?.zoom;
-  }
-
   getCapabilities() {
-    return {
-      zoom: true,
-      torch: true
-    };
+    return new ScannerCapabilities({
+      supportsNative: true,
+      supportsTorch: true,
+      supportsZoom: true,
+      supportsContinuousFocus: true, // CameraX faz isso
+      supportsAutoExposure: true,
+      supportsMultipleBarcodes: false, // Por enquanto não (RFC prevê no futuro)
+      supportsFormats: ['EAN_13', 'EAN_8', 'CODE_128', 'QR_CODE', 'CODE_39', 'DATA_MATRIX']
+    });
   }
 }
